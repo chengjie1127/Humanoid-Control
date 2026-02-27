@@ -1,0 +1,227 @@
+[0.108s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build', '--packages-select', 'humanoid_common', 'qpoases_colcon', 'humanoid_wbc', '--symlink-install']
+[0.108s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=True, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=12, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=['humanoid_common', 'qpoases_colcon', 'humanoid_wbc'], packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0x73d296760760>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x73d2967600a0>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x73d2967600a0>>)
+[0.269s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.269s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.269s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.269s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.269s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[0.269s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.269s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/tom/humanoid_ws/src/humanoid-control'
+[0.269s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[0.270s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extensions ['ignore', 'ignore_ament_install']
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'ignore'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'ignore_ament_install'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extensions ['colcon_pkg']
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'colcon_pkg'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extensions ['colcon_meta']
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'colcon_meta'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extensions ['ros']
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'ros'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extensions ['cmake', 'python']
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'cmake'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'python'
+[0.281s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extensions ['python_setup_py']
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(README.assets) by extension 'python_setup_py'
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extensions ['ignore', 'ignore_ament_install']
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extension 'ignore'
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extension 'ignore_ament_install'
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extensions ['colcon_pkg']
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extension 'colcon_pkg'
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extensions ['colcon_meta']
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extension 'colcon_meta'
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extensions ['ros']
+[0.282s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid-legged-description) by extension 'ros'
+[0.285s] DEBUG:colcon.colcon_core.package_identification:Package 'humanoid-legged-description' with type 'ros.ament_cmake' and name 'humanoid_legged_description'
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extensions ['ignore', 'ignore_ament_install']
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extension 'ignore'
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extension 'ignore_ament_install'
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extensions ['colcon_pkg']
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extension 'colcon_pkg'
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extensions ['colcon_meta']
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extension 'colcon_meta'
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extensions ['ros']
+[0.285s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_common) by extension 'ros'
+[0.286s] DEBUG:colcon.colcon_core.package_identification:Package 'humanoid_common' with type 'ros.ament_cmake' and name 'humanoid_common'
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extensions ['ignore', 'ignore_ament_install']
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extension 'ignore'
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extension 'ignore_ament_install'
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extensions ['colcon_pkg']
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extension 'colcon_pkg'
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extensions ['colcon_meta']
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extension 'colcon_meta'
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extensions ['ros']
+[0.286s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_controllers) by extension 'ros'
+[0.288s] DEBUG:colcon.colcon_core.package_identification:Package 'humanoid_controllers' with type 'ros.ament_cmake' and name 'humanoid_controllers'
+[0.288s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extensions ['ignore', 'ignore_ament_install']
+[0.288s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extension 'ignore'
+[0.288s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extension 'ignore_ament_install'
+[0.288s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extensions ['colcon_pkg']
+[0.288s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extension 'colcon_pkg'
+[0.288s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extensions ['colcon_meta']
+[0.289s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extension 'colcon_meta'
+[0.289s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extensions ['ros']
+[0.289s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_dummy) by extension 'ros'
+[0.292s] DEBUG:colcon.colcon_core.package_identification:Package 'humanoid_dummy' with type 'ros.ament_cmake' and name 'humanoid_dummy'
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extensions ['ignore', 'ignore_ament_install']
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extension 'ignore'
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extension 'ignore_ament_install'
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extensions ['colcon_pkg']
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extension 'colcon_pkg'
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extensions ['colcon_meta']
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extension 'colcon_meta'
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extensions ['ros']
+[0.292s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_estimation) by extension 'ros'
+[0.293s] DEBUG:colcon.colcon_core.package_identification:Package 'humanoid_estimation' with type 'ros.ament_cmake' and name 'humanoid_estimation'
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extensions ['ignore', 'ignore_ament_install']
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extension 'ignore'
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extension 'ignore_ament_install'
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extensions ['colcon_pkg']
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extension 'colcon_pkg'
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extensions ['colcon_meta']
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extension 'colcon_meta'
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extensions ['ros']
+[0.294s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_interface) by extension 'ros'
+[0.295s] DEBUG:colcon.colcon_core.package_identification:Package 'humanoid_interface' with type 'ros.ament_cmake' and name 'humanoid_interface'
+[0.295s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extensions ['ignore', 'ignore_ament_install']
+[0.295s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extension 'ignore'
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extension 'ignore_ament_install'
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extensions ['colcon_pkg']
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extension 'colcon_pkg'
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extensions ['colcon_meta']
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extension 'colcon_meta'
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extensions ['ros']
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(humanoid_wbc) by extension 'ros'
+[0.296s] DEBUG:colcon.colcon_core.package_identification:Package 'humanoid_wbc' with type 'ros.ament_cmake' and name 'humanoid_wbc'
+[0.296s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extensions ['ignore', 'ignore_ament_install']
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extension 'ignore'
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extension 'ignore_ament_install'
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extensions ['colcon_pkg']
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extension 'colcon_pkg'
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extensions ['colcon_meta']
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extension 'colcon_meta'
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extensions ['ros']
+[0.297s] Level 1:colcon.colcon_core.package_identification:_identify(mujoco_sim) by extension 'ros'
+[0.298s] DEBUG:colcon.colcon_core.package_identification:Package 'mujoco_sim' with type 'ros.ament_cmake' and name 'mujoco_sim'
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extensions ['ignore', 'ignore_ament_install']
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extension 'ignore'
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extension 'ignore_ament_install'
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extensions ['colcon_pkg']
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extension 'colcon_pkg'
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extensions ['colcon_meta']
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extension 'colcon_meta'
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extensions ['ros']
+[0.298s] Level 1:colcon.colcon_core.package_identification:_identify(qpoases_colcon) by extension 'ros'
+[0.299s] DEBUG:colcon.colcon_core.package_identification:Package 'qpoases_colcon' with type 'ros.ament_cmake' and name 'qpoases_colcon'
+[0.299s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[0.299s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[0.299s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[0.299s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[0.299s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[0.334s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'humanoid_interface' in 'humanoid_interface'
+[0.334s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'humanoid_legged_description' in 'humanoid-legged-description'
+[0.335s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'mujoco_sim' in 'mujoco_sim'
+[0.335s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'humanoid_dummy' in 'humanoid_dummy'
+[0.335s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'humanoid_estimation' in 'humanoid_estimation'
+[0.335s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'humanoid_controllers' in 'humanoid_controllers'
+[0.335s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[0.335s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[0.342s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 57 installed packages in /home/tom/ocs2_ws/install
+[0.344s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 280 installed packages in /opt/ros/humble
+[0.345s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'cmake_args' from command line to 'None'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'cmake_target' from command line to 'None'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'cmake_clean_cache' from command line to 'False'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'cmake_clean_first' from command line to 'False'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'cmake_force_configure' from command line to 'False'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'ament_cmake_args' from command line to 'None'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'catkin_cmake_args' from command line to 'None'
+[0.386s] Level 5:colcon.colcon_core.verb:set package 'humanoid_common' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.386s] DEBUG:colcon.colcon_core.verb:Building package 'humanoid_common' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/tom/humanoid_ws/src/humanoid-control/build/humanoid_common', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common', 'merge_install': False, 'path': '/home/tom/humanoid_ws/src/humanoid-control/humanoid_common', 'symlink_install': True, 'test_result_base': None}
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'cmake_args' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'cmake_target' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'cmake_clean_cache' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'cmake_clean_first' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'cmake_force_configure' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'ament_cmake_args' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'catkin_cmake_args' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'qpoases_colcon' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.387s] DEBUG:colcon.colcon_core.verb:Building package 'qpoases_colcon' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/tom/humanoid_ws/src/humanoid-control/build/qpoases_colcon', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/tom/humanoid_ws/src/humanoid-control/install/qpoases_colcon', 'merge_install': False, 'path': '/home/tom/humanoid_ws/src/humanoid-control/qpoases_colcon', 'symlink_install': True, 'test_result_base': None}
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'cmake_args' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'cmake_target' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'cmake_clean_cache' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'cmake_clean_first' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'cmake_force_configure' from command line to 'False'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'ament_cmake_args' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'catkin_cmake_args' from command line to 'None'
+[0.387s] Level 5:colcon.colcon_core.verb:set package 'humanoid_wbc' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.387s] DEBUG:colcon.colcon_core.verb:Building package 'humanoid_wbc' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/tom/humanoid_ws/src/humanoid-control/build/humanoid_wbc', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_wbc', 'merge_install': False, 'path': '/home/tom/humanoid_ws/src/humanoid-control/humanoid_wbc', 'symlink_install': True, 'test_result_base': None}
+[0.388s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[0.388s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[0.389s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/tom/humanoid_ws/src/humanoid-control/qpoases_colcon' with build type 'ament_cmake'
+[0.389s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/tom/humanoid_ws/src/humanoid-control/qpoases_colcon'
+[0.391s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.391s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.391s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.399s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/tom/humanoid_ws/src/humanoid-control/humanoid_common' with build type 'ament_cmake'
+[0.399s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/tom/humanoid_ws/src/humanoid-control/humanoid_common'
+[0.399s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.399s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.409s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/tom/humanoid_ws/src/humanoid-control/build/qpoases_colcon': CMAKE_PREFIX_PATH=/home/tom/ocs2_ws/install/ocs2_ros2:/home/tom/ocs2_ws/install/ocs2_robotic_examples:/home/tom/ocs2_ws/install/ocs2_anymal:/home/tom/ocs2_ws/install/ocs2_anymal_loopshaping_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_loopshaping_interface:/home/tom/ocs2_ws/install/ocs2_anymal_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_interface:/home/tom/ocs2_ws/install/segmented_planes_terrain_model:/home/tom/ocs2_ws/install/ocs2_sphere_approximation:/home/tom/ocs2_ws/install/ocs2_pinocchio:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator_ros:/home/tom/ocs2_ws/install/ocs2_self_collision_visualization:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator:/home/tom/ocs2_ws/install/ocs2_self_collision:/home/tom/ocs2_ws/install/ocs2_legged_robot_ros:/home/tom/ocs2_ws/install/ocs2_legged_robot:/home/tom/ocs2_ws/install/ocs2_centroidal_model:/home/tom/ocs2_ws/install/ocs2_anymal_models:/home/tom/ocs2_ws/install/ocs2_pinocchio_interface:/home/tom/ocs2_ws/install/pinocchio:/home/tom/ocs2_ws/install/ocs2_anymal_commands:/home/tom/ocs2_ws/install/ocs2_switched_model_interface:/home/tom/ocs2_ws/install/ocs2_ballbot_ros:/home/tom/ocs2_ws/install/ocs2_ballbot:/home/tom/ocs2_ws/install/ocs2_sqp:/home/tom/ocs2_ws/install/ocs2_slp:/home/tom/ocs2_ws/install/ocs2_quadrotor_ros:/home/tom/ocs2_ws/install/ocs2_double_integrator_ros:/home/tom/ocs2_ws/install/ocs2_cartpole_ros:/home/tom/ocs2_ws/install/ocs2_ros_interfaces:/home/tom/ocs2_ws/install/ocs2_quadrotor:/home/tom/ocs2_ws/install/ocs2_double_integrator:/home/tom/ocs2_ws/install/ocs2_python_interface:/home/tom/ocs2_ws/install/ocs2_perceptive:/home/tom/ocs2_ws/install/ocs2_cartpole:/home/tom/ocs2_ws/install/ocs2_robotic_tools:/home/tom/ocs2_ws/install/ocs2_ocs2:/home/tom/ocs2_ws/install/ocs2_ipm:/home/tom/ocs2_ws/install/ocs2_ddp:/home/tom/ocs2_ws/install/hpipm_catkin:/home/tom/ocs2_ws/install/ocs2_qp_solver:/home/tom/ocs2_ws/install/ocs2_mpc:/home/tom/ocs2_ws/install/ocs2_oc:/home/tom/ocs2_ws/install/ocs2_frank_wolfe:/home/tom/ocs2_ws/install/ocs2_core:/home/tom/ocs2_ws/install/ocs2_thirdparty:/home/tom/ocs2_ws/install/ocs2_switched_model_msgs:/home/tom/ocs2_ws/install/ocs2_robotic_assets:/home/tom/ocs2_ws/install/ocs2_msgs:/home/tom/ocs2_ws/install/hpp-fcl:/home/tom/ocs2_ws/install/convex_plane_decomposition_ros:/home/tom/ocs2_ws/install/convex_plane_decomposition:/opt/ros/humble:/home/tom/ocs2_ws/install/grid_map_filters_rsl:/home/tom/ocs2_ws/install/convex_plane_decomposition_msgs:/home/tom/ocs2_ws/install/cgal5_catkin:/home/tom/ocs2_ws/install/blasfeo_catkin /usr/bin/cmake --build /home/tom/humanoid_ws/src/humanoid-control/build/qpoases_colcon -- -j12 -l12
+[0.415s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/tom/humanoid_ws/src/humanoid-control/build/humanoid_common': CMAKE_PREFIX_PATH=/home/tom/ocs2_ws/install/ocs2_ros2:/home/tom/ocs2_ws/install/ocs2_robotic_examples:/home/tom/ocs2_ws/install/ocs2_anymal:/home/tom/ocs2_ws/install/ocs2_anymal_loopshaping_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_loopshaping_interface:/home/tom/ocs2_ws/install/ocs2_anymal_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_interface:/home/tom/ocs2_ws/install/segmented_planes_terrain_model:/home/tom/ocs2_ws/install/ocs2_sphere_approximation:/home/tom/ocs2_ws/install/ocs2_pinocchio:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator_ros:/home/tom/ocs2_ws/install/ocs2_self_collision_visualization:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator:/home/tom/ocs2_ws/install/ocs2_self_collision:/home/tom/ocs2_ws/install/ocs2_legged_robot_ros:/home/tom/ocs2_ws/install/ocs2_legged_robot:/home/tom/ocs2_ws/install/ocs2_centroidal_model:/home/tom/ocs2_ws/install/ocs2_anymal_models:/home/tom/ocs2_ws/install/ocs2_pinocchio_interface:/home/tom/ocs2_ws/install/pinocchio:/home/tom/ocs2_ws/install/ocs2_anymal_commands:/home/tom/ocs2_ws/install/ocs2_switched_model_interface:/home/tom/ocs2_ws/install/ocs2_ballbot_ros:/home/tom/ocs2_ws/install/ocs2_ballbot:/home/tom/ocs2_ws/install/ocs2_sqp:/home/tom/ocs2_ws/install/ocs2_slp:/home/tom/ocs2_ws/install/ocs2_quadrotor_ros:/home/tom/ocs2_ws/install/ocs2_double_integrator_ros:/home/tom/ocs2_ws/install/ocs2_cartpole_ros:/home/tom/ocs2_ws/install/ocs2_ros_interfaces:/home/tom/ocs2_ws/install/ocs2_quadrotor:/home/tom/ocs2_ws/install/ocs2_double_integrator:/home/tom/ocs2_ws/install/ocs2_python_interface:/home/tom/ocs2_ws/install/ocs2_perceptive:/home/tom/ocs2_ws/install/ocs2_cartpole:/home/tom/ocs2_ws/install/ocs2_robotic_tools:/home/tom/ocs2_ws/install/ocs2_ocs2:/home/tom/ocs2_ws/install/ocs2_ipm:/home/tom/ocs2_ws/install/ocs2_ddp:/home/tom/ocs2_ws/install/hpipm_catkin:/home/tom/ocs2_ws/install/ocs2_qp_solver:/home/tom/ocs2_ws/install/ocs2_mpc:/home/tom/ocs2_ws/install/ocs2_oc:/home/tom/ocs2_ws/install/ocs2_frank_wolfe:/home/tom/ocs2_ws/install/ocs2_core:/home/tom/ocs2_ws/install/ocs2_thirdparty:/home/tom/ocs2_ws/install/ocs2_switched_model_msgs:/home/tom/ocs2_ws/install/ocs2_robotic_assets:/home/tom/ocs2_ws/install/ocs2_msgs:/home/tom/ocs2_ws/install/hpp-fcl:/home/tom/ocs2_ws/install/convex_plane_decomposition_ros:/home/tom/ocs2_ws/install/convex_plane_decomposition:/opt/ros/humble:/home/tom/ocs2_ws/install/grid_map_filters_rsl:/home/tom/ocs2_ws/install/convex_plane_decomposition_msgs:/home/tom/ocs2_ws/install/cgal5_catkin:/home/tom/ocs2_ws/install/blasfeo_catkin /usr/bin/cmake /home/tom/humanoid_ws/src/humanoid-control/humanoid_common -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common
+[1.114s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/tom/humanoid_ws/src/humanoid-control/build/humanoid_common' returned '1': CMAKE_PREFIX_PATH=/home/tom/ocs2_ws/install/ocs2_ros2:/home/tom/ocs2_ws/install/ocs2_robotic_examples:/home/tom/ocs2_ws/install/ocs2_anymal:/home/tom/ocs2_ws/install/ocs2_anymal_loopshaping_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_loopshaping_interface:/home/tom/ocs2_ws/install/ocs2_anymal_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_interface:/home/tom/ocs2_ws/install/segmented_planes_terrain_model:/home/tom/ocs2_ws/install/ocs2_sphere_approximation:/home/tom/ocs2_ws/install/ocs2_pinocchio:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator_ros:/home/tom/ocs2_ws/install/ocs2_self_collision_visualization:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator:/home/tom/ocs2_ws/install/ocs2_self_collision:/home/tom/ocs2_ws/install/ocs2_legged_robot_ros:/home/tom/ocs2_ws/install/ocs2_legged_robot:/home/tom/ocs2_ws/install/ocs2_centroidal_model:/home/tom/ocs2_ws/install/ocs2_anymal_models:/home/tom/ocs2_ws/install/ocs2_pinocchio_interface:/home/tom/ocs2_ws/install/pinocchio:/home/tom/ocs2_ws/install/ocs2_anymal_commands:/home/tom/ocs2_ws/install/ocs2_switched_model_interface:/home/tom/ocs2_ws/install/ocs2_ballbot_ros:/home/tom/ocs2_ws/install/ocs2_ballbot:/home/tom/ocs2_ws/install/ocs2_sqp:/home/tom/ocs2_ws/install/ocs2_slp:/home/tom/ocs2_ws/install/ocs2_quadrotor_ros:/home/tom/ocs2_ws/install/ocs2_double_integrator_ros:/home/tom/ocs2_ws/install/ocs2_cartpole_ros:/home/tom/ocs2_ws/install/ocs2_ros_interfaces:/home/tom/ocs2_ws/install/ocs2_quadrotor:/home/tom/ocs2_ws/install/ocs2_double_integrator:/home/tom/ocs2_ws/install/ocs2_python_interface:/home/tom/ocs2_ws/install/ocs2_perceptive:/home/tom/ocs2_ws/install/ocs2_cartpole:/home/tom/ocs2_ws/install/ocs2_robotic_tools:/home/tom/ocs2_ws/install/ocs2_ocs2:/home/tom/ocs2_ws/install/ocs2_ipm:/home/tom/ocs2_ws/install/ocs2_ddp:/home/tom/ocs2_ws/install/hpipm_catkin:/home/tom/ocs2_ws/install/ocs2_qp_solver:/home/tom/ocs2_ws/install/ocs2_mpc:/home/tom/ocs2_ws/install/ocs2_oc:/home/tom/ocs2_ws/install/ocs2_frank_wolfe:/home/tom/ocs2_ws/install/ocs2_core:/home/tom/ocs2_ws/install/ocs2_thirdparty:/home/tom/ocs2_ws/install/ocs2_switched_model_msgs:/home/tom/ocs2_ws/install/ocs2_robotic_assets:/home/tom/ocs2_ws/install/ocs2_msgs:/home/tom/ocs2_ws/install/hpp-fcl:/home/tom/ocs2_ws/install/convex_plane_decomposition_ros:/home/tom/ocs2_ws/install/convex_plane_decomposition:/opt/ros/humble:/home/tom/ocs2_ws/install/grid_map_filters_rsl:/home/tom/ocs2_ws/install/convex_plane_decomposition_msgs:/home/tom/ocs2_ws/install/cgal5_catkin:/home/tom/ocs2_ws/install/blasfeo_catkin /usr/bin/cmake /home/tom/humanoid_ws/src/humanoid-control/humanoid_common -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common
+[1.166s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(humanoid_common)
+[1.173s] Level 1:colcon.colcon_core.environment:checking '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common' for CMake module files
+[1.173s] Level 1:colcon.colcon_core.environment:checking '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common' for CMake config files
+[1.174s] Level 1:colcon.colcon_core.environment:checking '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/bin'
+[1.174s] Level 1:colcon.colcon_core.environment:checking '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/lib/pkgconfig/humanoid_common.pc'
+[1.178s] Level 1:colcon.colcon_core.environment:checking '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/lib/python3.10/site-packages'
+[1.179s] Level 1:colcon.colcon_core.environment:checking '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/bin'
+[1.179s] INFO:colcon.colcon_core.shell:Creating package script '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/share/humanoid_common/package.ps1'
+[1.180s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/share/humanoid_common/package.dsv'
+[1.184s] INFO:colcon.colcon_core.shell:Creating package script '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/share/humanoid_common/package.sh'
+[1.185s] INFO:colcon.colcon_core.shell:Creating package script '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/share/humanoid_common/package.bash'
+[1.186s] INFO:colcon.colcon_core.shell:Creating package script '/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/share/humanoid_common/package.zsh'
+[1.191s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/tom/humanoid_ws/src/humanoid-control/install/humanoid_common/share/colcon-core/packages/humanoid_common)
+[4.760s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[4.760s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[4.760s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '1'
+[4.760s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[4.787s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[4.787s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[4.787s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[4.798s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[4.799s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/tom/humanoid_ws/src/humanoid-control/install/local_setup.ps1'
+[4.800s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/tom/humanoid_ws/src/humanoid-control/install/_local_setup_util_ps1.py'
+[4.810s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/tom/humanoid_ws/src/humanoid-control/install/setup.ps1'
+[4.819s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/tom/humanoid_ws/src/humanoid-control/install/local_setup.sh'
+[4.820s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/tom/humanoid_ws/src/humanoid-control/install/_local_setup_util_sh.py'
+[4.821s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/tom/humanoid_ws/src/humanoid-control/install/setup.sh'
+[4.825s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/tom/humanoid_ws/src/humanoid-control/install/local_setup.bash'
+[4.826s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/tom/humanoid_ws/src/humanoid-control/install/setup.bash'
+[4.830s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/tom/humanoid_ws/src/humanoid-control/install/local_setup.zsh'
+[4.831s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/tom/humanoid_ws/src/humanoid-control/install/setup.zsh'

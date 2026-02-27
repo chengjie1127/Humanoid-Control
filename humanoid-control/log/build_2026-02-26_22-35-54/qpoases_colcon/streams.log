@@ -1,0 +1,27 @@
+[0.018s] Invoking command in '/home/tom/humanoid_ws/src/humanoid-control/build/qpoases_colcon': CMAKE_PREFIX_PATH=/home/tom/ocs2_ws/install/ocs2_ros2:/home/tom/ocs2_ws/install/ocs2_robotic_examples:/home/tom/ocs2_ws/install/ocs2_anymal:/home/tom/ocs2_ws/install/ocs2_anymal_loopshaping_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_loopshaping_interface:/home/tom/ocs2_ws/install/ocs2_anymal_mpc:/home/tom/ocs2_ws/install/ocs2_quadruped_interface:/home/tom/ocs2_ws/install/segmented_planes_terrain_model:/home/tom/ocs2_ws/install/ocs2_sphere_approximation:/home/tom/ocs2_ws/install/ocs2_pinocchio:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator_ros:/home/tom/ocs2_ws/install/ocs2_self_collision_visualization:/home/tom/ocs2_ws/install/ocs2_mobile_manipulator:/home/tom/ocs2_ws/install/ocs2_self_collision:/home/tom/ocs2_ws/install/ocs2_legged_robot_ros:/home/tom/ocs2_ws/install/ocs2_legged_robot:/home/tom/ocs2_ws/install/ocs2_centroidal_model:/home/tom/ocs2_ws/install/ocs2_anymal_models:/home/tom/ocs2_ws/install/ocs2_pinocchio_interface:/home/tom/ocs2_ws/install/pinocchio:/home/tom/ocs2_ws/install/ocs2_anymal_commands:/home/tom/ocs2_ws/install/ocs2_switched_model_interface:/home/tom/ocs2_ws/install/ocs2_ballbot_ros:/home/tom/ocs2_ws/install/ocs2_ballbot:/home/tom/ocs2_ws/install/ocs2_sqp:/home/tom/ocs2_ws/install/ocs2_slp:/home/tom/ocs2_ws/install/ocs2_quadrotor_ros:/home/tom/ocs2_ws/install/ocs2_double_integrator_ros:/home/tom/ocs2_ws/install/ocs2_cartpole_ros:/home/tom/ocs2_ws/install/ocs2_ros_interfaces:/home/tom/ocs2_ws/install/ocs2_quadrotor:/home/tom/ocs2_ws/install/ocs2_double_integrator:/home/tom/ocs2_ws/install/ocs2_python_interface:/home/tom/ocs2_ws/install/ocs2_perceptive:/home/tom/ocs2_ws/install/ocs2_cartpole:/home/tom/ocs2_ws/install/ocs2_robotic_tools:/home/tom/ocs2_ws/install/ocs2_ocs2:/home/tom/ocs2_ws/install/ocs2_ipm:/home/tom/ocs2_ws/install/ocs2_ddp:/home/tom/ocs2_ws/install/hpipm_catkin:/home/tom/ocs2_ws/install/ocs2_qp_solver:/home/tom/ocs2_ws/install/ocs2_mpc:/home/tom/ocs2_ws/install/ocs2_oc:/home/tom/ocs2_ws/install/ocs2_frank_wolfe:/home/tom/ocs2_ws/install/ocs2_core:/home/tom/ocs2_ws/install/ocs2_thirdparty:/home/tom/ocs2_ws/install/ocs2_switched_model_msgs:/home/tom/ocs2_ws/install/ocs2_robotic_assets:/home/tom/ocs2_ws/install/ocs2_msgs:/home/tom/ocs2_ws/install/hpp-fcl:/home/tom/ocs2_ws/install/convex_plane_decomposition_ros:/home/tom/ocs2_ws/install/convex_plane_decomposition:/opt/ros/humble:/home/tom/ocs2_ws/install/grid_map_filters_rsl:/home/tom/ocs2_ws/install/convex_plane_decomposition_msgs:/home/tom/ocs2_ws/install/cgal5_catkin:/home/tom/ocs2_ws/install/blasfeo_catkin /usr/bin/cmake /home/tom/humanoid_ws/src/humanoid-control/qpoases_colcon -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/tom/humanoid_ws/src/humanoid-control/install/qpoases_colcon
+[0.105s] -- The C compiler identification is GNU 11.4.0
+[0.246s] -- The CXX compiler identification is GNU 11.4.0
+[0.263s] -- Detecting C compiler ABI info
+[0.430s] -- Detecting C compiler ABI info - done
+[0.439s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.440s] -- Detecting C compile features
+[0.440s] -- Detecting C compile features - done
+[0.443s] -- Detecting CXX compiler ABI info
+[0.552s] -- Detecting CXX compiler ABI info - done
+[0.561s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.561s] -- Detecting CXX compile features
+[0.562s] -- Detecting CXX compile features - done
+[0.571s] -- Found ament_cmake: 1.3.13 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.829s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.943s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[5.946s] [0mCMake Deprecation Warning at /home/tom/humanoid_ws/src/humanoid-control/build/qpoases_colcon/qpoases-src/CMakeLists.txt:32 (cmake_minimum_required):
+[5.946s]   Compatibility with CMake < 2.8.12 will be removed from a future version of
+[5.946s]   CMake.
+[5.946s] 
+[5.946s]   Update the VERSION argument <min> value or use a ...<max> suffix to tell
+[5.946s]   CMake that the project does not need compatibility with older versions.
+[5.946s] 
+[5.946s] [0m
+[6.022s] -- Configuring done
+[6.030s] -- Generating done
+[6.033s] -- Build files have been written to: /home/tom/humanoid_ws/src/humanoid-control/build/qpoases_colcon

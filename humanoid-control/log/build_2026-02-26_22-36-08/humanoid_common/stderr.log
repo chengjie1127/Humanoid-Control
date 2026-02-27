@@ -1,0 +1,10 @@
+[31mCMake Error in CMakeLists.txt:
+  Target "humanoid_common" INTERFACE_INCLUDE_DIRECTORIES property contains
+  path:
+
+    "/home/tom/humanoid_ws/src/humanoid-control/humanoid_common/include"
+
+  which is prefixed in the source directory.
+
+[0m
+[0mCMake Generate step failed.  Build files cannot be regenerated correctly.[0m

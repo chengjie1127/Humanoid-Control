@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="3">
+    <name>humanoid_estimation</name>
+    <version>0.0.0</version>
+    <description>The humanoid_estimation packages.</description>
+    <maintainer email="contact@bridgedp.com">bridgedp</maintainer>
+    <license>MIT</license>
+
+    <buildtool_depend>ament_cmake</buildtool_depend>
+
+    <build_depend>cmake_clang_tools</build_depend>
+    <depend>rclcpp</depend>
+    <depend>humanoid_common</depend>
+    <depend>realtime_tools</depend>
+    <depend>tf2_ros</depend>
+    <depend>tf2</depend>
+    <depend>tf2_geometry_msgs</depend>
+    <depend>humanoid_interface</depend>
+    <depend>geometry_msgs</depend>
+    <depend>nav_msgs</depend>
+    <depend>std_msgs</depend>
+
+    <export>
+        <build_type>ament_cmake</build_type>
+    </export>
+
+</package>

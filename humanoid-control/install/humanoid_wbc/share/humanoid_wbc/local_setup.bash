@@ -1,0 +1,1 @@
+/home/tom/humanoid_ws/src/humanoid-control/build/humanoid_wbc/ament_cmake_environment_hooks/local_setup.bash
