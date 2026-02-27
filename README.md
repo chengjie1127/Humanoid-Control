@@ -42,6 +42,13 @@ pip3 install scipy
 
 ### Getting Start
 
+Before building this workspace, ensure you have built and sourced the OCS2 workspace:
+```bash
+# E.g., if your OCS2 workspace is in ~/ocs2_ws
+source ~/ocs2_ws/install/setup.bash
+```
+
+Then build this workspace:
 ```bash
 colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --symlink-install #important
 source install/setup.bash
