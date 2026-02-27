@@ -1,8 +1,9 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, AppendEnvironmentVariable
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+import os
 
 def generate_launch_description():
     return LaunchDescription([
@@ -12,12 +13,27 @@ def generate_launch_description():
         DeclareLaunchArgument('urdfFileOrigin', default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_origin.urdf'])),
         DeclareLaunchArgument('gaitCommandFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/gait.info'])),
         
+        # Append OCS2 library paths to LD_LIBRARY_PATH so the nodes can find them at runtime
+        AppendEnvironmentVariable(
+            'LD_LIBRARY_PATH',
+            ':'.join([
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/hpipm_catkin/lib'),
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/hpp-fcl/lib'),
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_pinocchio_interface/lib'),
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_core/lib'),
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/pinocchio/lib'),
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/blasfeo_catkin/lib'),
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_msgs/lib'),
+                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_ros_interfaces/lib')
+            ])
+        ),
+        
         Node(
             package='humanoid_dummy',
             executable='humanoid_gait_command',
             name='humanoid_gait_command',
             output='screen',
-            prefix=['gnome-terminal', '--'],
+            prefix="gnome-terminal -- ",
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
@@ -67,6 +83,6 @@ def generate_launch_description():
             executable='teleop.py',
             name='teleop',
             output='screen',
-            prefix=['gnome-terminal', '--']
+            prefix=['gnome-terminal', '-- ', 'bash', '-c']
         )
     ])

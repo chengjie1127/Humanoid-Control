@@ -12,11 +12,8 @@ def generate_launch_description():
         robot_desc = infp.read()
 
     return LaunchDescription([
-        Node(
-            package='joint_state_publisher_gui',
-            executable='joint_state_publisher_gui',
-            name='joint_state_publisher_gui'
-        ),
+        # joint_state_publisher is intentionally left out to avoid errors.
+        # joint states should be published by the core dummy or simulation nodes.
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
