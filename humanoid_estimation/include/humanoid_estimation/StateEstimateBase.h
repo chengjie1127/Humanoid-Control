@@ -16,8 +16,7 @@ at www.bridgedp.com.
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 
-#include <humanoid_common/hardware_interface/ContactSensorInterface.h>
-#include <humanoid_common/hardware_interface/HybridJointInterface.h>
+
 #include <ocs2_centroidal_model/CentroidalModelInfo.h>
 #include <humanoid_interface/common/ModelSettings.h>
 #include <humanoid_interface/common/Types.h>

@@ -50,13 +50,13 @@ int main(int argc, char** argv) {
   bool multiplot = false;
   std::string taskFile, urdfFile, referenceFile;
   nodeHandle->declare_parameter<bool>("multiplot", false);
-  nodeHandle->declare_parameter<std::string>("taskFile", "");
-  nodeHandle->declare_parameter<std::string>("referenceFile", "");
-  nodeHandle->declare_parameter<std::string>("urdfFile", "");
   nodeHandle->get_parameter("multiplot", multiplot);
+  nodeHandle->declare_parameter<std::string>("taskFile", "");
   nodeHandle->get_parameter("taskFile", taskFile);
-  nodeHandle->get_parameter("referenceFile", referenceFile);
+  nodeHandle->declare_parameter<std::string>("urdfFile", "");
   nodeHandle->get_parameter("urdfFile", urdfFile);
+  nodeHandle->declare_parameter<std::string>("referenceFile", "");
+  nodeHandle->get_parameter("referenceFile", referenceFile);
 
   // Robot interface
   HumanoidInterface interface(taskFile, urdfFile, referenceFile);
@@ -93,8 +93,8 @@ int main(int argc, char** argv) {
   // Launch MPC ROS node
   MPC_ROS_Interface mpcNode(mpc, robotName);
   mpcNode.launchNodes(nodeHandle);
-  rclcpp::shutdown();
 
   // Successful exit
+  rclcpp::shutdown();
   return 0;
 }

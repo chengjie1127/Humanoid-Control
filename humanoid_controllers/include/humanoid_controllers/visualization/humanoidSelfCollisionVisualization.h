@@ -16,9 +16,9 @@ namespace humanoid {
 class humanoidSelfCollisionVisualization : public GeometryInterfaceVisualization {
  public:
   humanoidSelfCollisionVisualization(PinocchioInterface pinocchioInterface, PinocchioGeometryInterface geometryInterface,
-                                   const CentroidalModelPinocchioMapping& mapping, const rclcpp::Node::SharedPtr& nh, scalar_t maxUpdateFrequency = 50.0)
+                                   const CentroidalModelPinocchioMapping& mapping, scalar_t maxUpdateFrequency = 50.0)
       : mappingPtr_(mapping.clone()),
-        GeometryInterfaceVisualization(std::move(pinocchioInterface), std::move(geometryInterface), *nh, "odom"),
+        GeometryInterfaceVisualization(std::move(pinocchioInterface), std::move(geometryInterface), "odom"),
         lastTime_(std::numeric_limits<scalar_t>::lowest()),
         minPublishTimeDifference_(1.0 / maxUpdateFrequency) {}
   void update(const SystemObservation& observation) {

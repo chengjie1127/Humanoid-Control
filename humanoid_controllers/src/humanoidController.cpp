@@ -22,23 +22,22 @@
 #include <humanoid_estimation/LinearKalmanFilter.h>
 #include <humanoid_wbc/WeightedWbc.h>
 
-#include <rclcpp/rclcpp.hpp>
 
 
 namespace humanoid_controller{
 using namespace ocs2;
 using namespace humanoid;
-bool humanoidController::init(HybridJointInterface* robot_hw, const rclcpp::Node::SharedPtr& controller_nh) {
+bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
     controllerNh_ = controller_nh;
   // Initialize OCS2
   std::string urdfFile;
   std::string taskFile;
   std::string referenceFile;
     controllerNh_->declare_parameter<std::string>("urdfFile", "");
-    controllerNh_->declare_parameter<std::string>("taskFile", "");
-    controllerNh_->declare_parameter<std::string>("referenceFile", "");
     controllerNh_->get_parameter("urdfFile", urdfFile);
+    controllerNh_->declare_parameter<std::string>("taskFile", "");
     controllerNh_->get_parameter("taskFile", taskFile);
+    controllerNh_->declare_parameter<std::string>("referenceFile", "");
     controllerNh_->get_parameter("referenceFile", referenceFile);
   bool verbose = false;
   loadData::loadCppDataType(taskFile, "humanoid_interface.verbose", verbose);
@@ -47,12 +46,8 @@ bool humanoidController::init(HybridJointInterface* robot_hw, const rclcpp::Node
   setupMpc();
   setupMrt();
   // Visualization
-  auto nh = controllerNh_;
-  CentroidalModelPinocchioMapping pinocchioMapping(HumanoidInterface_->getCentroidalModelInfo());
-  eeKinematicsPtr_ = std::make_shared<PinocchioEndEffectorKinematics>(HumanoidInterface_->getPinocchioInterface(), pinocchioMapping,
-                                                                      HumanoidInterface_->modelSettings().contactNames3DoF);
   robotVisualizer_ = std::make_shared<HumanoidVisualizer>(HumanoidInterface_->getPinocchioInterface(),
-                                                             HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, nh);
+                                                             HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
 
   defalutJointPos_.resize(jointNum_);
   loadData::loadEigenMatrix(referenceFile, "defaultJointState", defalutJointPos_);
@@ -64,15 +59,13 @@ bool humanoidController::init(HybridJointInterface* robot_hw, const rclcpp::Node
     jointPos_ << 0.0, 0.0, 0.37, 0.90, 0.53, 0, 0.0, 0.0, 0.37, 0.90, 0.53, 0;
     jointVel_ = vector_t::Zero(jointNum_);
     quat_ = Eigen::Quaternion<scalar_t>(1, 0, 0, 0);
-  jointPosVelSub_ = controllerNh_->create_subscription<std_msgs::msg::Float32MultiArray>("/jointsPosVel", 10,
-      std::bind(&humanoidController::jointStateCallback, this, std::placeholders::_1));
-  imuSub_ = controllerNh_->create_subscription<sensor_msgs::msg::Imu>("/imu", 10,
-      std::bind(&humanoidController::ImuCallback, this, std::placeholders::_1));
+  jointPosVelSub_ = controllerNh_->create_subscription<std_msgs::msg::Float32MultiArray>("/jointsPosVel", 10, std::bind(&humanoidController::jointStateCallback, this, std::placeholders::_1));
+  imuSub_ = controllerNh_->create_subscription<sensor_msgs::msg::Imu>("/imu", 10, std::bind(&humanoidController::ImuCallback, this, std::placeholders::_1));
   targetTorquePub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetTorque", 10);
   targetPosPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetPos", 10);
-    targetVelPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetVel", 10);
-    targetKpPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetKp", 10);
-    targetKdPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetKd", 10);
+  targetVelPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetVel", 10);
+  targetKpPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetKp", 10);
+  targetKdPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetKd", 10);
 
   // State estimation
   setupStateEstimate(taskFile, verbose);
@@ -88,7 +81,7 @@ bool humanoidController::init(HybridJointInterface* robot_hw, const rclcpp::Node
   return true;
 }
 
-void humanoidController::jointStateCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+void humanoidController::jointStateCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg) {
   if (msg->data.size() != 2 * jointNum_) {
     RCLCPP_ERROR_STREAM(controllerNh_->get_logger(), "Received joint state message with wrong size: " << msg->data.size());
     return;
@@ -99,7 +92,7 @@ void humanoidController::jointStateCallback(const std_msgs::msg::Float32MultiArr
   }
 }
 
-void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
+void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg) {
     quat_.coeffs().w() = msg->orientation.w;
     quat_.coeffs().x() = msg->orientation.x;
     quat_.coeffs().y() = msg->orientation.y;
@@ -132,17 +125,17 @@ void humanoidController::starting(const rclcpp::Time& time) {
   // Set the first observation and command and wait for optimization to finish
   mpcMrtInterface_->setCurrentObservation(currentObservation_);
   mpcMrtInterface_->getReferenceManager().setTargetTrajectories(target_trajectories);
-  RCLCPP_INFO(controllerNh_->get_logger(), "Waiting for the initial policy ...");
+  RCLCPP_INFO_STREAM(controllerNh_->get_logger(), "Waiting for the initial policy ...");
   while (!mpcMrtInterface_->initialPolicyReceived() && rclcpp::ok()) {
     mpcMrtInterface_->advanceMpc();
-    rclcpp::Rate(HumanoidInterface_->mpcSettings().mrtDesiredFrequency_).sleep();
+    rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(1.0 / HumanoidInterface_->mpcSettings().mrtDesiredFrequency_)));
   }
-  RCLCPP_INFO(controllerNh_->get_logger(), "Initial policy has been received.");
+  RCLCPP_INFO_STREAM(controllerNh_->get_logger(), "Initial policy has been received.");
 
   mpcRunning_ = true;
 }
 
-void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {
+void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {  
 
   // State Estimate
   updateStateEstimation(time, period);
@@ -161,7 +154,7 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
   currentObservation_.input = optimizedInput;
 
   wbcTimer_.startTimer();
-  vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.toSec());
+  vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
   wbcTimer_.endTimer();
 
   const vector_t& torque = x.tail(jointNum_);
@@ -173,13 +166,13 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
   vector_t posDes = centroidal_model::getJointAngles(optimizedState, HumanoidInterface_->getCentroidalModelInfo());
   vector_t velDes = centroidal_model::getJointVelocities(optimizedInput, HumanoidInterface_->getCentroidalModelInfo());
 
-  scalar_t dt = period.toSec();
+  scalar_t dt = period.seconds();
   posDes = posDes + 0.5 * wbc_planned_joint_acc * dt * dt;
   velDes = velDes + wbc_planned_joint_acc * dt;
 
   // Safety check, if failed, stop the controller
   if (!safetyChecker_->check(currentObservation_, optimizedState, optimizedInput)) {
-    RCLCPP_ERROR(controllerNh_->get_logger(), "[humanoid Controller] Safety check failed, stopping the controller.");
+    RCLCPP_ERROR_STREAM(controllerNh_->get_logger(), "[humanoid Controller] Safety check failed, stopping the controller.");
     //TODO: send the stop command to hardware interface
     return;
   }
@@ -244,7 +237,7 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   stateEstimate_->updateContact(contactFlag);
   stateEstimate_->updateImu(quat, angularVel, linearAccel, orientationCovariance, angularVelCovariance, linearAccelCovariance);
   measuredRbdState_ = stateEstimate_->update(time, period);
-  currentObservation_.time += period.toSec();
+  currentObservation_.time += period.seconds();
   scalar_t yawLast = currentObservation_.state(9);
   currentObservation_.state = rbdConversions_->computeCentroidalStateFromRbdModel(measuredRbdState_);
   currentObservation_.state(9) = yawLast + angles::shortest_angular_distance(yawLast, currentObservation_.state(9));
@@ -281,16 +274,14 @@ void humanoidController::setupMpc() {
                                                                     HumanoidInterface_->getCentroidalModelInfo());
 
   const std::string robotName = "humanoid";
-  auto nh = controllerNh_;
-  // Gait receiver
   auto gaitReceiverPtr =
-      std::make_shared<GaitReceiver>(*nh, HumanoidInterface_->getSwitchedModelReferenceManagerPtr()->getGaitSchedule(), robotName);
+      std::make_shared<GaitReceiver>(controllerNh_, HumanoidInterface_->getSwitchedModelReferenceManagerPtr()->getGaitSchedule(), robotName);
   // ROS ReferenceManager
   auto rosReferenceManagerPtr = std::make_shared<RosReferenceManager>(robotName, HumanoidInterface_->getReferenceManagerPtr());
-  rosReferenceManagerPtr->subscribe(*nh);
+  rosReferenceManagerPtr->subscribe(controllerNh_);
   mpc_->getSolverPtr()->addSynchronizedModule(gaitReceiverPtr);
   mpc_->getSolverPtr()->setReferenceManager(rosReferenceManagerPtr);
-  observationPublisher_ = nh->create_publisher<ocs2_msgs::msg::MpcObservation>(robotName + "_mpc_observation", 1);
+  observationPublisher_ = controllerNh_->create_publisher<ocs2_msgs::msg::MpcObservation>(robotName + "_mpc_observation", 1);
 }
 
 void humanoidController::setupMrt() {
@@ -330,7 +321,7 @@ void humanoidController::setupStateEstimate(const std::string& taskFile, bool ve
 
 void humanoidCheaterController::setupStateEstimate(const std::string& /*taskFile*/, bool /*verbose*/) {
   stateEstimate_ = std::make_shared<FromTopicStateEstimate>(HumanoidInterface_->getPinocchioInterface(),
-                                                            HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, *controllerNh_);
+                                                            HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
 }
 
 }  // namespace humanoid_controller

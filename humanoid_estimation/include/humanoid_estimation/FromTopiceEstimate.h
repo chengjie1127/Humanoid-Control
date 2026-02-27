@@ -11,7 +11,7 @@ at www.bridgedp.com.
 
 #include "humanoid_estimation/StateEstimateBase.h"
 
-#include <realtime_tools/realtime_buffer.h>
+#include <realtime_tools/realtime_buffer.hpp>
 
 #pragma once
 namespace ocs2

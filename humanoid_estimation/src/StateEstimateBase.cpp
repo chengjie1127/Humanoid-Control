@@ -51,10 +51,10 @@ StateEstimateBase::StateEstimateBase(PinocchioInterface pinocchioInterface, Cent
   , rbdState_(vector_t ::Zero(2 * info_.generalizedCoordinatesNum))
   , latestStanceposition_{}
 {
-  node_ = rclcpp::Node::make_shared("humanoid_estimation_state");
+  node_ = std::make_shared<rclcpp::Node>("humanoid_estimation_state");
   odomPub_ = node_->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
   posePub_ = node_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose", 10);
-  lastPub_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+  lastPub_ = node_->now();
 
   pSCgZinvlast_.resize(info_.generalizedCoordinatesNum);
   pSCgZinvlast_.setZero();
@@ -128,7 +128,7 @@ void StateEstimateBase::publishMsgs(const nav_msgs::msg::Odometry& odom)
 // ref: Contact Model Fusion for Event-Based Locomotion in Unstructured Terrains. Gerardo Bledt etc.
 void StateEstimateBase::estContactForce(const rclcpp::Duration& period)
 {
-  scalar_t dt = period.toSec();
+  scalar_t dt = period.seconds();
   if (dt > 1)
     dt = 0.002;
   const scalar_t lamda = cutoffFrequency_;

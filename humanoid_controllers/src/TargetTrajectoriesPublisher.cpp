@@ -8,7 +8,6 @@
 #include <ocs2_core/Types.h>
 #include <ocs2_core/misc/LoadData.h>
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
-#include <rclcpp/rclcpp.hpp>
 
 
 using namespace ocs2;
@@ -105,8 +104,8 @@ int main(int argc, char** argv) {
   std::string referenceFile;
   std::string taskFile;
   nodeHandle->declare_parameter<std::string>("referenceFile", "");
-  nodeHandle->declare_parameter<std::string>("taskFile", "");
   nodeHandle->get_parameter("referenceFile", referenceFile);
+  nodeHandle->declare_parameter<std::string>("taskFile", "");
   nodeHandle->get_parameter("taskFile", taskFile);
 
   loadData::loadCppDataType(referenceFile, "comHeight", COM_HEIGHT);

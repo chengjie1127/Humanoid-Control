@@ -20,13 +20,11 @@ its dependencies following the step below.
    # Install dependencies
    sudo apt install liburdfdom-dev liboctomap-dev libassimp-dev
    ```
-2. Compile the `ocs2_legged_robot_ros` package in your ROS2 OCS2 workspace (for example, `~/ocs2_ws`).
+2. Compile the `ocs2_legged_robot_ros` package with `colcon build`.
+   It will take you about ten minutes.
    
    ```bash
-    cd ~/ocs2_ws
-    colcon build --packages-select ocs2_legged_robot_ros ocs2_self_collision_visualization \
-       --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
-    source ~/ocs2_ws/install/setup.bash
+   colcon build --packages-up-to ocs2_legged_robot_ros ocs2_self_collision_visualization --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
    ```
    Ensure you can command the ANYmal as shown in
    the [document](https://leggedrobotics.github.io/ocs2/robotic_examples.html#legged-robot) and below.
@@ -42,81 +40,20 @@ pip3 install pynput #for teleop.py
 pip3 install scipy
 ```
 
-### Getting Start (ROS2)
+### Getting Start
 
 ```bash
-# Build this workspace
-cd ~/humanoid_ws
-source ~/ocs2_ws/install/setup.bash
-colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
-source ~/humanoid_ws/install/setup.bash
-```
+colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --symlink-install #important
+source install/setup.bash
 
-#### Run with RViz (model visualization)
-
-```bash
-source ~/ocs2_ws/install/setup.bash
-source ~/humanoid_ws/install/setup.bash
-ros2 launch humanoid_legged_description display.launch.py
-```
-
-#### Run with Gazebo (optional)
-
-```bash
-source ~/ocs2_ws/install/setup.bash
-source ~/humanoid_ws/install/setup.bash
-ros2 launch humanoid_legged_description gazebo.launch.py
-```
-
-#### Run with MuJoCo + controllers
-
-Start MuJoCo in terminal 1:
-
-```bash
-source ~/ocs2_ws/install/setup.bash
-source ~/humanoid_ws/install/setup.bash
-ros2 run mujoco_sim humanoid_sim.py
-```
-
-Start controller in terminal 2:
-
-```bash
-# Cheat state estimator controller
+# To start simulation with the cheat state estimator.
+# Press SPACE on mujoco simulation window and input the gait command. 
 ros2 launch humanoid_controllers load_cheat_controller.launch.py
 
-# Or normal state estimator controller
+# To start simulation with the normal state estimator.
 ros2 launch humanoid_controllers load_normal_controller.launch.py
-```
 
-#### Quick Start (MuJoCo + Cheat Controller)
-
-Use 2 terminals.
-
-Terminal 1:
-
-```bash
-source ~/ocs2_ws/install/setup.bash
-source ~/humanoid_ws/install/setup.bash
-ros2 run mujoco_sim humanoid_sim.py
-```
-
-Terminal 2:
-
-```bash
-source ~/ocs2_ws/install/setup.bash
-source ~/humanoid_ws/install/setup.bash
-ros2 launch humanoid_controllers load_cheat_controller.launch.py
-```
-
-Notes:
-- Press `SPACE` in the MuJoCo window to unpause simulation.
-- Make sure MuJoCo and Gazebo are not running at the same time.
-
-#### Run only NMPC + dummy node
-
-```bash
-source ~/ocs2_ws/install/setup.bash
-source ~/humanoid_ws/install/setup.bash
+# To start only the NMPC module and simulate with OCS2 dummy node
 ros2 launch humanoid_dummy legged_robot_sqp.launch.py
 ```
 
@@ -281,4 +218,4 @@ where $t$ is the WBC period.
 
 [hunter-bipedal-control by BridgeDP](https://github.com/bridgedp/hunter_bipedal_control): An open source bipedal robot control framework, based on non-linear MPC and WBC, tailered for EC-hunter80-v01 bipedal robot. 
 
-[pai-sim by High-Torque](https://github.com/humarobot/Hector_Simulation): Acknowledgement for the Mujoco simulation framework in python. 
+[pai-sim by High-Torque](https://github.com/humarobot/Hector_Simulation): Acknowledgement for the Mujoco simulation framework in python.

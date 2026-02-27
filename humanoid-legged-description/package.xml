@@ -1,3 +1,5 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>humanoid_legged_description</name>
   <version>1.0.0</version>
@@ -7,20 +9,16 @@
 for humanoid_legged_description robot</p>
   </description>
   <author>TODO</author>
-  <maintainer email="TODO@email.com" />
+  <maintainer email="TODO@email.com">TODO</maintainer>
   <license>BSD</license>
+
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <exec_depend>launch</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
-  <exec_depend>tf2_ros</exec_depend>
-  <depend>robot_state_publisher</depend>
-  <depend>rviz2</depend>
-  <depend>joint_state_publisher_gui</depend>
-  <depend>gazebo</depend>
-  <depend>gazebo_ros</depend>
-  <depend>std_msgs</depend>
+
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
-    <architecture_independent />
   </export>
 </package>

@@ -43,13 +43,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_ros_interfaces/visualization/VisualizationHelpers.h>
 #include "humanoid_interface/gait/MotionPhaseDefinition.h"
 
-// Additional messages not in the helpers file
-#include <geometry_msgs/msg/pose_array.hpp>
-#include <geometry_msgs/msg/transform_stamped.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
 
-// URDF related
-#include <urdf/model.h>
 
 namespace ocs2 {
 namespace humanoid {
@@ -58,34 +52,33 @@ namespace humanoid {
 /******************************************************************************************************/
 /******************************************************************************************************/
 HumanoidVisualizer::HumanoidVisualizer(PinocchioInterface pinocchioInterface, CentroidalModelInfo centroidalModelInfo,
-                                             const PinocchioEndEffectorKinematics& endEffectorKinematics,
-                                             const rclcpp::Node::SharedPtr& nodeHandle,
+                                             const PinocchioEndEffectorKinematics& endEffectorKinematics, std::shared_ptr<rclcpp::Node> node,
                                              scalar_t maxUpdateFrequency)
     : pinocchioInterface_(std::move(pinocchioInterface)),
       centroidalModelInfo_(std::move(centroidalModelInfo)),
       endEffectorKinematicsPtr_(endEffectorKinematics.clone()),
-        node_(nodeHandle),
       lastTime_(std::numeric_limits<scalar_t>::lowest()),
       minPublishTimeDifference_(1.0 / maxUpdateFrequency) {
   endEffectorKinematicsPtr_->setPinocchioInterface(pinocchioInterface_);
-      tfBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(node_);
-  launchVisualizerNode(nodeHandle);
+  launchVisualizerNode(node);
 };
 
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::launchVisualizerNode(const rclcpp::Node::SharedPtr& nodeHandle) {
-  costDesiredBasePositionPublisher_ = nodeHandle->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredBaseTrajectory", 1);
+void HumanoidVisualizer::launchVisualizerNode(std::shared_ptr<rclcpp::Node> node) {
+  node_ = node;
+  costDesiredBasePositionPublisher_ = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredBaseTrajectory", 1);
   costDesiredFeetPositionPublishers_.resize(centroidalModelInfo_.numThreeDofContacts);
-  costDesiredFeetPositionPublishers_[0] = nodeHandle->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/LTOE", 1);
-  costDesiredFeetPositionPublishers_[1] = nodeHandle->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/LHEEL", 1);
-  costDesiredFeetPositionPublishers_[2] = nodeHandle->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/RTOE", 1);
-  costDesiredFeetPositionPublishers_[3] = nodeHandle->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/RHEEL", 1);
-  stateOptimizedPublisher_ = nodeHandle->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/optimizedStateTrajectory", 1);
-  currentStatePublisher_ = nodeHandle->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/currentState", 1);
+  costDesiredFeetPositionPublishers_[0] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/LTOE", 1);
+  costDesiredFeetPositionPublishers_[1] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/LHEEL", 1);
+  costDesiredFeetPositionPublishers_[2] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/RTOE", 1);
+  costDesiredFeetPositionPublishers_[3] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/RHEEL", 1);
+  stateOptimizedPublisher_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/optimizedStateTrajectory", 1);
+  currentStatePublisher_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/currentState", 1);
 
-  nodeHandle->declare_parameter<std::string>("humanoid_description", "");
+  jointStatePublisher_ = node_->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 1);
+  tfBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(node_);
 }
 
 /******************************************************************************************************/
@@ -110,7 +103,7 @@ void HumanoidVisualizer::update(const SystemObservation& observation, const Prim
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::publishObservation(const rclcpp::Time& timeStamp, const SystemObservation& observation) {
+void HumanoidVisualizer::publishObservation(rclcpp::Time timeStamp, const SystemObservation& observation) {
   // Extract components from state
   const auto basePose = centroidal_model::getBasePose(observation.state, centroidalModelInfo_);
   const auto qJoints = centroidal_model::getJointAngles(observation.state, centroidalModelInfo_);
@@ -131,23 +124,34 @@ void HumanoidVisualizer::publishObservation(const rclcpp::Time& timeStamp, const
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::publishJointTransforms(const rclcpp::Time& timeStamp, const vector_t& jointAngles) const {
-  (void)timeStamp;
-  (void)jointAngles;
+void HumanoidVisualizer::publishJointTransforms(rclcpp::Time timeStamp, const vector_t& jointAngles) const {
+  if (jointStatePublisher_ != nullptr) {
+    sensor_msgs::msg::JointState jointMsg;
+    jointMsg.header.stamp = timeStamp;
+    jointMsg.name = {"leg_l1_joint", "leg_l2_joint", "leg_l3_joint", "leg_l4_joint", "leg_l5_joint", "leg_l6_joint",
+                     "leg_r1_joint", "leg_r2_joint", "leg_r3_joint", "leg_r4_joint", "leg_r5_joint", "leg_r6_joint"};
+    jointMsg.position.resize(12);
+    for (size_t i = 0; i < 12; ++i) {
+      jointMsg.position[i] = jointAngles[i];
+    }
+    jointStatePublisher_->publish(jointMsg);
+  }
 }
 
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::publishBaseTransform(const rclcpp::Time& timeStamp, const vector_t& basePose) {
-  geometry_msgs::msg::TransformStamped baseToWorldTransform;
-  baseToWorldTransform.header = getHeaderMsg(frameId_, timeStamp);
-  baseToWorldTransform.child_frame_id = "dummy_link";
+void HumanoidVisualizer::publishBaseTransform(rclcpp::Time timeStamp, const vector_t& basePose) {
+  if (tfBroadcaster_ != nullptr) {
+    geometry_msgs::msg::TransformStamped baseToWorldTransform;
+    baseToWorldTransform.header = getHeaderMsg(frameId_, timeStamp);
+    baseToWorldTransform.child_frame_id = "dummy_link";
 
-  const Eigen::Quaternion<scalar_t> q_world_base = getQuaternionFromEulerAnglesZyx(vector3_t(basePose.tail<3>()));
-  baseToWorldTransform.transform.rotation = getOrientationMsg(q_world_base);
-  baseToWorldTransform.transform.translation = getVectorMsg(basePose.head<3>());
-  tfBroadcaster_->sendTransform(baseToWorldTransform);
+    const Eigen::Quaternion<scalar_t> q_world_base = getQuaternionFromEulerAnglesZyx(vector3_t(basePose.tail<3>()));
+    baseToWorldTransform.transform.rotation = getOrientationMsg(q_world_base);
+    baseToWorldTransform.transform.translation = getVectorMsg(basePose.head<3>());
+    tfBroadcaster_->sendTransform(baseToWorldTransform);
+  }
 }
 
 /******************************************************************************************************/
@@ -158,8 +162,7 @@ void HumanoidVisualizer::publishTrajectory(const std::vector<SystemObservation>&
     scalar_t frameDuration = speed * (system_observation_array[k + 1].time - system_observation_array[k].time);
     scalar_t publishDuration = timedExecutionInSeconds([&]() { publishObservation(node_->now(), system_observation_array[k]); });
     if (frameDuration > publishDuration) {
-      rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::duration<double>(frameDuration - publishDuration)));
+      rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(frameDuration - publishDuration)));
     }
   }
 }
@@ -167,7 +170,7 @@ void HumanoidVisualizer::publishTrajectory(const std::vector<SystemObservation>&
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::publishCartesianMarkers(const rclcpp::Time& timeStamp, const contact_flag_t& contactFlags,
+void HumanoidVisualizer::publishCartesianMarkers(rclcpp::Time timeStamp, const contact_flag_t& contactFlags,
                                                     const std::vector<vector3_t>& feetPositions,
                                                     const std::vector<vector3_t>& feetForces) const {
   // Reserve message
@@ -201,7 +204,7 @@ void HumanoidVisualizer::publishCartesianMarkers(const rclcpp::Time& timeStamp, 
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::publishDesiredTrajectory(const rclcpp::Time& timeStamp, const TargetTrajectories& targetTrajectories) {
+void HumanoidVisualizer::publishDesiredTrajectory(rclcpp::Time timeStamp, const TargetTrajectories& targetTrajectories) {
   const auto& stateTrajectory = targetTrajectories.stateTrajectory;
   const auto& inputTrajectory = targetTrajectories.inputTrajectory;
 
@@ -264,7 +267,7 @@ void HumanoidVisualizer::publishDesiredTrajectory(const rclcpp::Time& timeStamp,
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::publishOptimizedStateTrajectory(const rclcpp::Time& timeStamp, const scalar_array_t& mpcTimeTrajectory,
+void HumanoidVisualizer::publishOptimizedStateTrajectory(rclcpp::Time timeStamp, const scalar_array_t& mpcTimeTrajectory,
                                                             const vector_array_t& mpcStateTrajectory, const ModeSchedule& modeSchedule) {
   if (mpcTimeTrajectory.empty() || mpcStateTrajectory.empty()) {
     return;  // Nothing to publish
@@ -272,8 +275,7 @@ void HumanoidVisualizer::publishOptimizedStateTrajectory(const rclcpp::Time& tim
 
   // Reserve Feet msg
   feet_array_t<std::vector<geometry_msgs::msg::Point>> feetMsgs;
-  std::for_each(feetMsgs.begin(), feetMsgs.end(),
-                [&](std::vector<geometry_msgs::msg::Point>& v) { v.reserve(mpcStateTrajectory.size()); });
+  std::for_each(feetMsgs.begin(), feetMsgs.end(), [&](std::vector<geometry_msgs::msg::Point>& v) { v.reserve(mpcStateTrajectory.size()); });
 
   // Reserve Com Msg
   std::vector<geometry_msgs::msg::Point> mpcComPositionMsgs;

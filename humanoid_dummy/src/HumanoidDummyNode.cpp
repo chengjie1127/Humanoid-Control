@@ -49,10 +49,10 @@ int main(int argc, char** argv) {
   // Get node parameters
   std::string taskFile, urdfFile, referenceFile;
   nodeHandle->declare_parameter<std::string>("taskFile", "");
-  nodeHandle->declare_parameter<std::string>("urdfFile", "");
-  nodeHandle->declare_parameter<std::string>("referenceFile", "");
   nodeHandle->get_parameter("taskFile", taskFile);
+  nodeHandle->declare_parameter<std::string>("urdfFile", "");
   nodeHandle->get_parameter("urdfFile", urdfFile);
+  nodeHandle->declare_parameter<std::string>("referenceFile", "");
   nodeHandle->get_parameter("referenceFile", referenceFile);
 
   // Robot interface
@@ -87,8 +87,7 @@ int main(int argc, char** argv) {
   // run dummy
   HumanoidDummySimulator.run(initObservation, initTargetTrajectories);
 
-  rclcpp::shutdown();
-
   // Successful exit
+  rclcpp::shutdown();
   return 0;
 }

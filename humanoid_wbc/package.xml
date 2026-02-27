@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
     <name>humanoid_wbc</name>
     <version>0.0.0</version>
@@ -9,12 +10,9 @@
 
     <buildtool_depend>ament_cmake</buildtool_depend>
 
-    <build_depend>cmake_clang_tools</build_depend>
     <depend>humanoid_interface</depend>
-    <depend>qpoases_colcon</depend>
+    <depend>qpoases_catkin</depend>
     <depend>pinocchio</depend>
-
-    <test_depend>ament_cmake_gtest</test_depend>
 
     <export>
         <build_type>ament_cmake</build_type>

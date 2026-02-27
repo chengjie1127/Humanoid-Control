@@ -73,7 +73,7 @@ KalmanFilterEstimate::KalmanFilterEstimate(PinocchioInterface pinocchioInterface
 
 vector_t KalmanFilterEstimate::update(const rclcpp::Time& time, const rclcpp::Duration& period)
 {
-  scalar_t dt = period.toSec();
+  scalar_t dt = period.seconds();
   a_.block(0, 3, 3, 3) = dt * Eigen::Matrix<scalar_t, 3, 3>::Identity();
   b_.block(0, 0, 3, 3) = 0.5 * dt * dt * Eigen::Matrix<scalar_t, 3, 3>::Identity();
   b_.block(3, 0, 3, 3) = dt * Eigen::Matrix<scalar_t, 3, 3>::Identity();
@@ -177,7 +177,7 @@ vector_t KalmanFilterEstimate::update(const rclcpp::Time& time, const rclcpp::Du
   updateLinear(xHat_.segment<3>(0), xHat_.segment<3>(3));
 
   auto odom = getOdomMsg();
-  odom.header.stamp = time.to_msg();
+  odom.header.stamp = time;
   odom.header.frame_id = "odom";
   odom.child_frame_id = "dummy_link";
   publishMsgs(odom);

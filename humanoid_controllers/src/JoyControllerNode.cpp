@@ -4,7 +4,6 @@
 
 #include "humanoid_controllers/humanoidController.h"
 #include "humanoid_dummy/gait/GaitKeyboardPublisher.h"
-#include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <std_msgs/msg/string.hpp>
 
@@ -48,7 +47,7 @@ void gaitCommandPublisher(){
 /**
  * @brief cmd_vel callback
 */
-void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg){
+void cmdVelCallback(const geometry_msgs::msg::Twist::ConstSharedPtr& msg){
     vx = msg->linear.x;
     vy = msg->linear.y;
     vyaw = msg->angular.z;
@@ -57,14 +56,14 @@ void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg){
 /**
  * @brief desired_gait callback
 */
-void desiredGaitCallback(const std_msgs::msg::String::SharedPtr msg){
+void desiredGaitCallback(const std_msgs::msg::String::ConstSharedPtr& msg){
     desiredGait = msg->data;
 }
 
 
 int main(int argc, char** argv){
     const std::string robotName = "humanoid";
-    rclcpp::Duration elapsedTime_ = rclcpp::Duration::from_seconds(0.0);
+    rclcpp::Duration elapsedTime_(0, 0);
 
     rclcpp::init(argc, argv);
     auto nh = rclcpp::Node::make_shared("humanoid_joy_controller_node");
@@ -76,13 +75,11 @@ int main(int argc, char** argv){
     std::cerr << "Loading gait file: " << gaitCommandFile << std::endl;
 
     // init the gaitCommand ptr
-    gaitCommand = std::make_shared<GaitKeyboardPublisher>(*nh, gaitCommandFile, robotName, true);
+    gaitCommand = std::make_shared<GaitKeyboardPublisher>(nh, gaitCommandFile, robotName, true);
 
     //---------------------------------------------------
-    humanoid_controller::HybridJointInterface* robot_hw;
-    //create a subscriber to pauseFlag
     humanoid_controller::humanoidController controller;
-    if (!controller.init(robot_hw, nh)) {
+    if (!controller.init(nh)) {
         RCLCPP_ERROR(nh->get_logger(), "Failed to initialize the humanoid controller!");
         return -1;
     }
@@ -99,7 +96,7 @@ int main(int argc, char** argv){
     auto desired_gait_sub = nh->create_subscription<std_msgs::msg::String>("desired_gait_str", 1, desiredGaitCallback);
 
     //create a thread to spin the node
-    std::thread spin_thread([nh](){
+    std::thread spin_thread([&](){
         rclcpp::spin(nh);
     });
     spin_thread.detach();

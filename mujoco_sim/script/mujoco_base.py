@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import mujoco as mj
 from mujoco.glfw import glfw
-from rclpy.node import Node
+import rclpy
 from std_msgs.msg import Bool 
 
-class MuJoCoBase:
-    def __init__(self, xml_path, node: Node):
+class MuJoCoBase():
+    def __init__(self, xml_path, node):
         self.node = node
         # For callback functions
         self.button_left = False

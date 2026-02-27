@@ -4,11 +4,7 @@
 
 #pragma once
 
-#include <hardware_interface/imu_sensor_interface.h>
-#include <humanoid_common/hardware_interface/ContactSensorInterface.h>
-
 #include <rclcpp/rclcpp.hpp>
-#include <ocs2_msgs/msg/mpc_observation.hpp>
 
 #include <ocs2_centroidal_model/CentroidalModelRbdConversions.h>
 #include <ocs2_core/misc/Benchmark.h>
@@ -22,9 +18,10 @@
 #include "humanoid_controllers/SafetyChecker.h"
 #include "humanoid_controllers/visualization/humanoidSelfCollisionVisualization.h"
 
-#include "std_msgs/msg/float32_multi_array.hpp"
-#include "std_msgs/msg/bool.hpp"
-#include "sensor_msgs/msg/imu.hpp"
+#include <std_msgs/msg/float32_multi_array.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <ocs2_msgs/msg/mpc_observation.hpp>
 
 namespace humanoid_controller{
 using namespace ocs2;
@@ -33,8 +30,8 @@ using namespace humanoid;
 class humanoidController {
  public:
   humanoidController() = default;
-  ~humanoidController();
-  bool init(HybridJointInterface* robot_hw, const rclcpp::Node::SharedPtr& controller_nh);
+  virtual ~humanoidController();
+  bool init(std::shared_ptr<rclcpp::Node> controller_nh);
   void update(const rclcpp::Time& time, const rclcpp::Duration& period);
   void starting(const rclcpp::Time& time);
   void stopping(const rclcpp::Time& /*time*/) { mpcRunning_ = false; }
@@ -48,8 +45,8 @@ class humanoidController {
   virtual void setupMrt();
   virtual void setupStateEstimate(const std::string& taskFile, bool verbose);
 
-  void jointStateCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
-  void ImuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
+  void jointStateCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
+  void ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg);
 
   // Interface
   std::shared_ptr<HumanoidInterface> HumanoidInterface_;
@@ -76,14 +73,14 @@ class humanoidController {
   //Controller Interface
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetTorquePub_;
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetPosPub_;
-    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetVelPub_;
-    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetKpPub_;
-    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetKdPub_;
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr jointPosVelSub_;
-    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
+  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetVelPub_;
+  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetKpPub_;
+  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetKdPub_;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr jointPosVelSub_;
+  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 
-    // Node Handle
-    rclcpp::Node::SharedPtr controllerNh_;
+  // Node Handle
+  std::shared_ptr<rclcpp::Node> controllerNh_;
 
 
  private:

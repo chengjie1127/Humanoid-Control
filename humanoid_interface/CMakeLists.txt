@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.8)
 project(humanoid_interface)
 
 # Generate compile_commands.json for clang tools
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CATKIN_PACKAGE_DEPENDENCIES
+set(AMENT_PACKAGE_DEPENDENCIES
   ocs2_core
   ocs2_oc
   ocs2_ddp
@@ -19,15 +19,9 @@ set(CATKIN_PACKAGE_DEPENDENCIES
 )
 
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_gtest QUIET)
-
-foreach(dependency IN ITEMS ${CATKIN_PACKAGE_DEPENDENCIES})
-  find_package(${dependency} REQUIRED)
+foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
+  find_package(${dep} REQUIRED)
 endforeach()
-
-find_package(catkin QUIET COMPONENTS
-  ${CATKIN_PACKAGE_DEPENDENCIES}
-)
 
 find_package(Boost REQUIRED COMPONENTS
   system
@@ -41,10 +35,6 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(pinocchio REQUIRED pinocchio)
 
-###########
-## Build ##
-###########
-
 # Resolve for the package path at compile time.
 configure_file (
   "${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/package_path.h.in"
@@ -52,7 +42,7 @@ configure_file (
 )
 
 set(FLAGS
-  ${OCS2_CXX_FLAGS}
+  # ${OCS2_CXX_FLAGS}
   ${pinocchio_CFLAGS_OTHER}
   -Wno-ignored-attributes
   -Wno-invalid-partial-specialization   # to silence warning with unsupported Eigen Tensor
@@ -62,7 +52,6 @@ set(FLAGS
 
 include_directories(
   include
-  ${PROJECT_BINARY_DIR}/include
   ${pinocchio_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
@@ -73,7 +62,7 @@ link_directories(
 )
 
 # Legged robot interface library
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/common/ModelSettings.cpp
   src/dynamics/HumanoidDynamicsAD.cpp
   src/constraint/EndEffectorLinearConstraint.cpp
@@ -94,84 +83,49 @@ add_library(${PROJECT_NAME}
   src/HumanoidInterface.cpp
   src/HumanoidPreComputation.cpp
 )
-target_include_directories(${PROJECT_NAME} PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
-target_link_libraries(${PROJECT_NAME}
+
+target_link_libraries(${PROJECT_NAME} PUBLIC
   ${Boost_LIBRARIES}
   ${pinocchio_LIBRARIES}
   dl
 )
-ament_target_dependencies(${PROJECT_NAME}
-  ${CATKIN_PACKAGE_DEPENDENCIES}
-)
+foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
+  if (NOT ${dep} MATCHES "ocs2_robotic_assets")
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${dep}::${dep})
+  endif()
+endforeach()
+
 target_compile_options(${PROJECT_NAME} PUBLIC ${FLAGS})
 
-#########################
-###   CLANG TOOLING   ###
-#########################
-
-find_package(cmake_clang_tools QUIET)
-if(cmake_clang_tools_FOUND)
-   message(STATUS "Run clang tooling for target humanoid_interface")
-   add_clang_tooling(
-     TARGETS ${PROJECT_NAME}
-     SOURCE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/test
-     CT_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
-     CF_WERROR
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
-endif(cmake_clang_tools_FOUND)
 
-#############
-## Install ##
-#############
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
+  if (NOT ${dep} MATCHES "ocs2_robotic_assets")
+    ament_export_dependencies(${dep})
+  endif()
+endforeach()
+ament_export_dependencies(Boost)
+ament_export_dependencies(Eigen3)
 
 install(TARGETS ${PROJECT_NAME}
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION lib/${PROJECT_NAME}
+  RUNTIME DESTINATION bin
 )
+
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION include/${PROJECT_NAME}
 )
-install(DIRECTORY ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}/
-  DESTINATION include/${PROJECT_NAME}
-)
+
 install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}
+  DESTINATION share/${PROJECT_NAME}/
 )
-
-#############
-## Testing ##
-#############
-
-if(BUILD_TESTING AND ament_cmake_gtest_FOUND)
-  ament_add_gtest(${PROJECT_NAME}_test
-    test/AnymalFactoryFunctions.cpp
-    test/constraint/testEndEffectorLinearConstraint.cpp
-    test/constraint/testFrictionConeConstraint.cpp
-    test/constraint/testZeroForceConstraint.cpp
-  )
-  target_include_directories(${PROJECT_NAME}_test PRIVATE
-    test/include
-    ${PROJECT_BINARY_DIR}/include
-  )
-  target_link_libraries(${PROJECT_NAME}_test
-    gtest_main
-    ${PROJECT_NAME}
-    ${Boost_LIBRARIES}
-  )
-  ament_target_dependencies(${PROJECT_NAME}_test
-    ${CATKIN_PACKAGE_DEPENDENCIES}
-  )
-  target_compile_options(${PROJECT_NAME}_test PRIVATE ${FLAGS})
-endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(${CATKIN_PACKAGE_DEPENDENCIES})
-ament_export_include_directories(include ${PROJECT_BINARY_DIR}/include)
-
 ament_package()

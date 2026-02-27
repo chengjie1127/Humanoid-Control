@@ -33,6 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <ocs2_core/misc/CommandLine.h>
 #include <ocs2_core/misc/LoadData.h>
+#include <ocs2_msgs/msg/mode_schedule.hpp>
 
 #include "humanoid_dummy/gait/ModeSequenceTemplateRos.h"
 
@@ -42,14 +43,12 @@ namespace humanoid {
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-GaitKeyboardPublisher::GaitKeyboardPublisher(const rclcpp::Node::SharedPtr& nodeHandle, const std::string& gaitFile,
-                                             const std::string& robotName,
-                                             bool verbose) {
-  node_ = nodeHandle;
+GaitKeyboardPublisher::GaitKeyboardPublisher(std::shared_ptr<rclcpp::Node> node, const std::string& gaitFile, const std::string& robotName,
+                                             bool verbose) : node_(node) {
   RCLCPP_INFO_STREAM(node_->get_logger(), robotName + "_mpc_mode_schedule node is setting up ...");
   loadData::loadStdVector(gaitFile, "list", gaitList_, verbose);
 
-  modeSequenceTemplatePublisher_ = nodeHandle->create_publisher<ocs2_msgs::msg::ModeSchedule>(robotName + "_mpc_mode_schedule", 1);
+  modeSequenceTemplatePublisher_ = node_->create_publisher<ocs2_msgs::msg::ModeSchedule>(robotName + "_mpc_mode_schedule", 1);
 
   gaitMap_.clear();
   for (const auto& gaitName : gaitList_) {

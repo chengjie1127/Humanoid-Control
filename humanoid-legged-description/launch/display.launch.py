@@ -1,34 +1,33 @@
+import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
-import os
-
 
 def generate_launch_description():
-    pkg_share = get_package_share_directory('humanoid_legged_description')
-    urdf_path = os.path.join(pkg_share, 'urdf', 'humanoid_legged_origin.urdf')
-
-    with open(urdf_path, 'r', encoding='utf-8') as urdf_file:
-        robot_description = urdf_file.read()
+    urdf_file_name = 'urdf/humanoid_legged_origin.urdf'
+    urdf = os.path.join(
+        get_package_share_directory('humanoid_legged_description'),
+        urdf_file_name)
+    with open(urdf, 'r') as infp:
+        robot_desc = infp.read()
 
     return LaunchDescription([
         Node(
             package='joint_state_publisher_gui',
             executable='joint_state_publisher_gui',
-            name='joint_state_publisher_gui',
-            output='screen'
+            name='joint_state_publisher_gui'
         ),
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
-            output='screen',
-            parameters=[{'robot_description': robot_description}]
+            parameters=[{'robot_description': robot_desc}]
         ),
         Node(
             package='rviz2',
             executable='rviz2',
-            name='rviz',
-            output='screen'
+            name='rviz2',
+            output='screen',
+            arguments=['-d', os.path.join(get_package_share_directory('humanoid_legged_description'), 'urdf.rviz')]
         ),
     ])

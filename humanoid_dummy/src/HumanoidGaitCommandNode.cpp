@@ -52,8 +52,7 @@ int main(int argc, char* argv[]) {
     gaitCommand.getKeyboardCommand();
   }
 
-  rclcpp::shutdown();
-
   // Successful exit
+  rclcpp::shutdown();
   return 0;
 }

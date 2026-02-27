@@ -3,8 +3,6 @@
 //
 
 #include "humanoid_controllers/humanoidController.h"
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/bool.hpp>
 #include <thread>
 
 using Duration = std::chrono::duration<double>;
@@ -12,21 +10,21 @@ using Clock = std::chrono::high_resolution_clock;
 
 bool pause_flag = false;
 
-void pauseCallback(const std_msgs::msg::Bool::SharedPtr msg){
+void pauseCallback(const std_msgs::msg::Bool::ConstSharedPtr& msg){
     pause_flag = msg->data;
     std::cerr << "pause_flag: " << pause_flag << std::endl;
 }
 
 int main(int argc, char** argv){
-    rclcpp::Duration elapsedTime_ = rclcpp::Duration::from_seconds(0.0);
+    rclcpp::Duration elapsedTime_(0, 0);
 
     rclcpp::init(argc, argv);
-    auto nh = rclcpp::Node::make_shared("humanoid_controller_node");
-    humanoid_controller::HybridJointInterface* robot_hw;
+    auto nh = rclcpp::Node::make_shared("cheat_controller_node");
+
     //create a subscriber to pauseFlag
     auto pause_sub = nh->create_subscription<std_msgs::msg::Bool>("pauseFlag", 1, pauseCallback);
     humanoid_controller::humanoidCheaterController controller;
-    if (!controller.init(robot_hw, nh)) {
+    if (!controller.init(nh)) {
         RCLCPP_ERROR(nh->get_logger(), "Failed to initialize the humanoid controller!");
         return -1;
     }
@@ -37,7 +35,7 @@ int main(int argc, char** argv){
     auto lastTime = startTime;
 
     //create a thread to spin the node
-    std::thread spin_thread([nh](){
+    std::thread spin_thread([&](){
         rclcpp::spin(nh);
     });
     spin_thread.detach();
@@ -55,7 +53,7 @@ int main(int argc, char** argv){
             lastTime = currentTime;
 
             // Check cycle time for excess delay
-//            const double cycle_time_error = (elapsedTime_ - rclcpp::Duration::from_seconds(desiredDuration.count())).toSec();
+//            const double cycle_time_error = (elapsedTime_ - ros::Duration(desiredDuration.count())).toSec();
 //            if (cycle_time_error > cycleTimeErrorThreshold_) {
 //                ROS_WARN_STREAM("Cycle time exceeded error threshold by: " << cycle_time_error - cycleTimeErrorThreshold_ << "s, "
 //                                                                           << "cycle time: " << elapsedTime_ << "s, "
@@ -74,6 +72,5 @@ int main(int argc, char** argv){
 
 
 
-    rclcpp::shutdown();
     return 0;
 }

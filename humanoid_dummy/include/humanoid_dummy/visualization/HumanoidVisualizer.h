@@ -31,6 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_ros/transform_broadcaster.h>
+#include <sensor_msgs/msg/joint_state.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
@@ -64,39 +65,38 @@ class HumanoidVisualizer : public DummyObserver {
    * @param maxUpdateFrequency : maximum publish frequency measured in MPC time.
    */
   HumanoidVisualizer(PinocchioInterface pinocchioInterface, CentroidalModelInfo centroidalModelInfo,
-                        const PinocchioEndEffectorKinematics& endEffectorKinematics,
-                        const rclcpp::Node::SharedPtr& nodeHandle,
+                        const PinocchioEndEffectorKinematics& endEffectorKinematics, std::shared_ptr<rclcpp::Node> node,
                         scalar_t maxUpdateFrequency = 100.0);
 
   ~HumanoidVisualizer() override = default;
 
   void update(const SystemObservation& observation, const PrimalSolution& primalSolution, const CommandData& command) override;
 
-  void launchVisualizerNode(const rclcpp::Node::SharedPtr& nodeHandle);
+  void launchVisualizerNode(std::shared_ptr<rclcpp::Node> node);
 
   void publishTrajectory(const std::vector<SystemObservation>& system_observation_array, scalar_t speed = 1.0);
 
-  void publishObservation(const rclcpp::Time& timeStamp, const SystemObservation& observation);
+  void publishObservation(rclcpp::Time timeStamp, const SystemObservation& observation);
 
-  void publishDesiredTrajectory(const rclcpp::Time& timeStamp, const TargetTrajectories& targetTrajectories);
+  void publishDesiredTrajectory(rclcpp::Time timeStamp, const TargetTrajectories& targetTrajectories);
 
-  void publishOptimizedStateTrajectory(const rclcpp::Time& timeStamp, const scalar_array_t& mpcTimeTrajectory,
+  void publishOptimizedStateTrajectory(rclcpp::Time timeStamp, const scalar_array_t& mpcTimeTrajectory,
                                        const vector_array_t& mpcStateTrajectory, const ModeSchedule& modeSchedule);
 
  private:
   HumanoidVisualizer(const HumanoidVisualizer&) = delete;
-  void publishJointTransforms(const rclcpp::Time& timeStamp, const vector_t& jointAngles) const;
-  void publishBaseTransform(const rclcpp::Time& timeStamp, const vector_t& basePose);
-  void publishCartesianMarkers(const rclcpp::Time& timeStamp, const contact_flag_t& contactFlags,
-                               const std::vector<vector3_t>& feetPositions,
+  void publishJointTransforms(rclcpp::Time timeStamp, const vector_t& jointAngles) const;
+  void publishBaseTransform(rclcpp::Time timeStamp, const vector_t& basePose);
+  void publishCartesianMarkers(rclcpp::Time timeStamp, const contact_flag_t& contactFlags, const std::vector<vector3_t>& feetPositions,
                                const std::vector<vector3_t>& feetForces) const;
 
   PinocchioInterface pinocchioInterface_;
   const CentroidalModelInfo centroidalModelInfo_;
   std::unique_ptr<PinocchioEndEffectorKinematics> endEffectorKinematicsPtr_;
 
-  rclcpp::Node::SharedPtr node_;
+  std::shared_ptr<rclcpp::Node> node_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tfBroadcaster_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr jointStatePublisher_;
 
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr costDesiredBasePositionPublisher_;
   std::vector<rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr> costDesiredFeetPositionPublishers_;

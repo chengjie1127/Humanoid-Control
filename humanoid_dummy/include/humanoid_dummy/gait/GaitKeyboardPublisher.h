@@ -33,9 +33,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <ocs2_msgs/msg/mode_schedule.hpp>
 
 #include <humanoid_interface/gait/ModeSequenceTemplate.h>
-#include <humanoid_dummy/gait/ModeSequenceTemplateRos.h>
 
 namespace ocs2 {
 namespace humanoid {
@@ -43,8 +44,7 @@ namespace humanoid {
 /** This class implements ModeSequence communication using ROS. */
 class GaitKeyboardPublisher {
  public:
-  GaitKeyboardPublisher(const rclcpp::Node::SharedPtr& nodeHandle, const std::string& gaitFile, const std::string& robotName,
-                        bool verbose = false);
+  GaitKeyboardPublisher(std::shared_ptr<rclcpp::Node> node, const std::string& gaitFile, const std::string& robotName, bool verbose = false);
 
   /** Prints the command line interface and responds to user input. Function returns after one user input. */
   void getKeyboardCommand();
@@ -56,8 +56,8 @@ class GaitKeyboardPublisher {
 
   std::vector<std::string> gaitList_;
   std::map<std::string, ModeSequenceTemplate> gaitMap_;
-  rclcpp::Node::SharedPtr node_;
 
+  std::shared_ptr<rclcpp::Node> node_;
   rclcpp::Publisher<ocs2_msgs::msg::ModeSchedule>::SharedPtr modeSequenceTemplatePublisher_;
 };
 

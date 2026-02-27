@@ -46,8 +46,7 @@ namespace humanoid {
 
 class GaitReceiver : public SolverSynchronizedModule {
  public:
-  GaitReceiver(const rclcpp::Node::SharedPtr& nodeHandle, std::shared_ptr<GaitSchedule> gaitSchedulePtr,
-               const std::string& robotName);
+  GaitReceiver(std::shared_ptr<rclcpp::Node> node, std::shared_ptr<GaitSchedule> gaitSchedulePtr, const std::string& robotName);
 
   void preSolverRun(scalar_t initTime, scalar_t finalTime, const vector_t& currentState,
                     const ReferenceManagerInterface& referenceManager) override;
@@ -55,10 +54,9 @@ class GaitReceiver : public SolverSynchronizedModule {
   void postSolverRun(const PrimalSolution& primalSolution) override{};
 
  private:
-  void mpcModeSequenceCallback(const ocs2_msgs::msg::ModeSchedule::SharedPtr msg);
+  void mpcModeSequenceCallback(const ocs2_msgs::msg::ModeSchedule::ConstSharedPtr& msg);
 
   std::shared_ptr<GaitSchedule> gaitSchedulePtr_;
-  rclcpp::Node::SharedPtr node_;
 
   rclcpp::Subscription<ocs2_msgs::msg::ModeSchedule>::SharedPtr mpcModeSequenceSubscriber_;
 
