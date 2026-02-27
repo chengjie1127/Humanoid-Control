@@ -1,1 +1,0 @@
-/home/tom/humanoid_ws/src/humanoid-control/humanoid_interface/include/humanoid_interface/initialization/HumanoidInitializer.h

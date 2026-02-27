@@ -1,1 +1,0 @@
-/home/tom/humanoid_ws/src/humanoid-control/build/humanoid_interface/include/humanoid_interface/package_path.h
