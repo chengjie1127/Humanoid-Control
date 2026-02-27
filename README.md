@@ -53,7 +53,7 @@ ros2 launch humanoid_controllers load_cheat_controller.launch.py
 # To start simulation with the normal state estimator.
 ros2 launch humanoid_controllers load_normal_controller.launch.py
 
-# To start only the NMPC module and simulate with OCS2 dummy node
+# To start only the NMPC module and simulate with OCS2 dummy node (Useful for isolated testing of the NMPC, Gait changes, and OCS2 interface without MuJoCo physics)
 ros2 launch humanoid_dummy legged_robot_sqp.launch.py
 ```
 
