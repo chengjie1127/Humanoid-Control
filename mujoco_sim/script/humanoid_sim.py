@@ -116,6 +116,7 @@ class HumanoidSim(MuJoCoBase):
         else:
             # Advance local time frame minimally without physics steps so the outer GUI renders and rclpy updates
             simstart -= 1.0/60.0
+            time.sleep(1.0/60.0)
         
         if (self.data.time - publish_time >= 1.0 / 500.0):
           # * Publish joint positions and velocities
@@ -268,10 +269,16 @@ def main(args=None):
     sim.reset()
     
     import threading
+    import traceback
+    import os
     spin_thread = threading.Thread(target=rclpy.spin, args=(node,))
     spin_thread.start()
     
-    sim.simulate()
+    try:
+        sim.simulate()
+    except Exception as e:
+        print(f"\n[CRITICAL ERROR] Python Main Thread crashed in humanoid_sim.py:\n{traceback.format_exc()}\n")
+        os._exit(1)
     
     node.destroy_node()
     rclpy.shutdown()
