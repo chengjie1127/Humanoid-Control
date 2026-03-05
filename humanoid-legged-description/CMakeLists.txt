@@ -3,7 +3,7 @@ project(humanoid_legged_description)
 
 find_package(ament_cmake REQUIRED)
 
-install(DIRECTORY config launch meshes urdf
+install(DIRECTORY config launch meshes urdf mjcf
   DESTINATION share/${PROJECT_NAME}
 )
 

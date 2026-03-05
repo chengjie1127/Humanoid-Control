@@ -9,7 +9,7 @@ For further information, contact: contact@bridgedp.com or visit our website
 at www.bridgedp.com.
 ********************************************************************************/
 
-#include "humanoid_estimation/StateEstimateBase.h"
+#include "StateEstimateBase.h"
 
 #include <realtime_tools/realtime_buffer.hpp>
 

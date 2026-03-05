@@ -174,7 +174,7 @@ class HumanoidSim(MuJoCoBase):
 
       if (self.data.time - torque_publish_time >= 1.0 / 40.0):
         targetTorque = Float32MultiArray()
-        targetTorque.data = self.data.ctrl[:]
+        targetTorque.data = self.data.ctrl[:].tolist()
         self.pubRealTorque.publish(targetTorque)
         torque_publish_time = self.data.time
 
@@ -187,7 +187,7 @@ class HumanoidSim(MuJoCoBase):
         # get last 12 element of qpos and qvel
         qp = self.data.qpos[-12:].copy()
         qv = np.zeros(12)
-        jointsPosVel.data = np.concatenate((qp,qv))
+        jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
         self.pubJoints.publish(jointsPosVel)
         # * Publish body pose
@@ -210,12 +210,12 @@ class HumanoidSim(MuJoCoBase):
         bodyOdom.pose.pose.orientation.y = ori[2]
         bodyOdom.pose.pose.orientation.z = ori[3]
         bodyOdom.pose.pose.orientation.w = ori[0]
-        bodyOdom.twist.twist.linear.x = 0
-        bodyOdom.twist.twist.linear.y = 0
-        bodyOdom.twist.twist.linear.z = 0
-        bodyOdom.twist.twist.angular.x = 0
-        bodyOdom.twist.twist.angular.y = 0
-        bodyOdom.twist.twist.angular.z = 0
+        bodyOdom.twist.twist.linear.x = 0.0
+        bodyOdom.twist.twist.linear.y = 0.0
+        bodyOdom.twist.twist.linear.z = 0.0
+        bodyOdom.twist.twist.angular.x = 0.0
+        bodyOdom.twist.twist.angular.y = 0.0
+        bodyOdom.twist.twist.angular.z = 0.0
         self.pubOdom.publish(bodyOdom)
 
         bodyImu = Imu()
