@@ -103,58 +103,111 @@ class HumanoidSim(MuJoCoBase):
     sim_epoch_start = time.time()
     
     while not glfw.window_should_close(self.window):
-      # Paced by glfw.swap_buffers vsync blocking at end of loop
-      
-      # Run physics steps until we catch up to 1/60th of a second (if not paused)
-      if not self.pause_flag:
-        simstart = self.data.time
-        while (self.data.time - simstart < 1.0/60.0):
+      simstart = self.data.time
+
+      while (self.data.time - simstart < 1.0/60.0):
+        if not self.pause_flag:
           if (time.time() - sim_epoch_start >= 1.0 / self.sim_rate):
             # MIT control
             self.data.ctrl[:] = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
             # Step simulation environment
             mj.mj_step(self.model, self.data)
             sim_epoch_start = time.time()
-      else:
-        # Give Python threads breathing room during pauses
-        time.sleep(0.001)
+        else:
+            # Advance local time frame minimally without physics steps so the outer GUI renders and rclpy updates
+            simstart -= 1.0/60.0
+        
+        if (self.data.time - publish_time >= 1.0 / 500.0):
+          # * Publish joint positions and velocities
+          jointsPosVel = Float32MultiArray()
+          # get last 12 element of qpos and qvel
+          qp = self.data.qpos[-12:].copy()
+          qv = self.data.qvel[-12:].copy()
+          jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
-      # Process normal physics-controlled publications if spinning, 
-      # or force-publish static state if paused (self.data.time doesn't increase)
-      if (not self.pause_flag and self.data.time - publish_time >= 1.0 / 500.0) or self.pause_flag:
+          self.pubJoints.publish(jointsPosVel)
+          # * Publish body pose
+          bodyOdom = Odometry()
+          pos = self.data.sensor('BodyPos').data.copy()
+
+          #add imu bias
+          ori = self.data.sensor('BodyQuat').data.copy()
+          # Ensure correct scipy XYZW quaternion mapping from MuJoCo WXYZ
+          ori_scipy = np.array([ori[1], ori[2], ori[3], ori[0]])
+          eul = R.from_quat(ori_scipy).as_euler('xyz')
+          eul += imu_eular_bias
+          ori_new = R.from_euler('xyz', eul).as_quat()
+
+          vel = self.data.qvel[:3].copy()
+          angVel = self.data.sensor('BodyGyro').data.copy()
+
+          bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
+          bodyOdom.pose.pose.position.x = float(pos[0])
+          bodyOdom.pose.pose.position.y = float(pos[1])
+          bodyOdom.pose.pose.position.z = float(pos[2])
+          bodyOdom.pose.pose.orientation.x = float(ori_new[0])
+          bodyOdom.pose.pose.orientation.y = float(ori_new[1])
+          bodyOdom.pose.pose.orientation.z = float(ori_new[2])
+          bodyOdom.pose.pose.orientation.w = float(ori_new[3])
+          bodyOdom.twist.twist.linear.x = float(vel[0])
+          bodyOdom.twist.twist.linear.y = float(vel[1])
+          bodyOdom.twist.twist.linear.z = float(vel[2])
+          bodyOdom.twist.twist.angular.x = float(angVel[0])
+          bodyOdom.twist.twist.angular.y = float(angVel[1])
+          bodyOdom.twist.twist.angular.z = float(angVel[2])
+          self.pubOdom.publish(bodyOdom)
+
+          bodyImu = Imu()
+          acc = self.data.sensor('BodyAcc').data.copy()
+          bodyImu.header.stamp = self.node.get_clock().now().to_msg()
+          bodyImu.angular_velocity.x = float(angVel[0])
+          bodyImu.angular_velocity.y = float(angVel[1])
+          bodyImu.angular_velocity.z = float(angVel[2])
+          bodyImu.linear_acceleration.x = float(acc[0])
+          bodyImu.linear_acceleration.y = float(acc[1])
+          bodyImu.linear_acceleration.z = float(acc[2])
+          bodyImu.orientation.x = float(ori_new[0])
+          bodyImu.orientation.y = float(ori_new[1])
+          bodyImu.orientation.z = float(ori_new[2])
+          bodyImu.orientation.w = float(ori_new[3])
+          bodyImu.orientation_covariance = [0.0, 0, 0, 0, 0.0, 0, 0, 0, 0.0]
+          bodyImu.angular_velocity_covariance = [0.0, 0, 0, 0, 0.0, 0, 0, 0, 0.0]
+          bodyImu.linear_acceleration_covariance = [0.0, 0, 0, 0, 0.0, 0, 0, 0, 0.0]
+          self.pubImu.publish(bodyImu)
+
+          publish_time = self.data.time
+
+      if (self.data.time - torque_publish_time >= 1.0 / 40.0):
+        targetTorque = Float32MultiArray()
+        targetTorque.data = self.data.ctrl[:].tolist()
+        self.pubRealTorque.publish(targetTorque)
+        torque_publish_time = self.data.time
+
+      if self.data.time >= self.simend:
+          break
+      if self.pause_flag:
+        # publish the state even if the simulation is paused
         # * Publish joint positions and velocities
         jointsPosVel = Float32MultiArray()
         # get last 12 element of qpos and qvel
         qp = self.data.qpos[-12:].copy()
-        
-        if self.pause_flag:
-            qv = np.zeros(12)
-        else:
-            qv = self.data.qvel[-12:].copy()
-            
+        qv = np.zeros(12)
         jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
         self.pubJoints.publish(jointsPosVel)
-        
         # * Publish body pose
         bodyOdom = Odometry()
         pos = self.data.sensor('BodyPos').data.copy()
 
         #add imu bias
         ori = self.data.sensor('BodyQuat').data.copy()
-        # Ensure correct scipy XYZW quaternion mapping from MuJoCo WXYZ
         ori_scipy = np.array([ori[1], ori[2], ori[3], ori[0]])
         eul = R.from_quat(ori_scipy).as_euler('xyz')
         eul += imu_eular_bias
         ori_new = R.from_euler('xyz', eul).as_quat()
 
-        if self.pause_flag:
-            vel = np.zeros(3)
-            angVel = np.zeros(3)
-        else:
-            vel = self.data.qvel[:3].copy()
-            angVel = self.data.sensor('BodyGyro').data.copy()
-
+        vel = self.data.qvel[:3].copy()
+        angVel = self.data.sensor('BodyGyro').data.copy()
         bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
         bodyOdom.pose.pose.position.x = float(pos[0])
         bodyOdom.pose.pose.position.y = float(pos[1])
@@ -163,39 +216,27 @@ class HumanoidSim(MuJoCoBase):
         bodyOdom.pose.pose.orientation.y = float(ori_new[1])
         bodyOdom.pose.pose.orientation.z = float(ori_new[2])
         bodyOdom.pose.pose.orientation.w = float(ori_new[3])
-        bodyOdom.twist.twist.linear.x = float(vel[0])
-        bodyOdom.twist.twist.linear.y = float(vel[1])
-        bodyOdom.twist.twist.linear.z = float(vel[2])
-        bodyOdom.twist.twist.angular.x = float(angVel[0])
-        bodyOdom.twist.twist.angular.y = float(angVel[1])
-        bodyOdom.twist.twist.angular.z = float(angVel[2])
+        bodyOdom.twist.twist.linear.x = 0.0
+        bodyOdom.twist.twist.linear.y = 0.0
+        bodyOdom.twist.twist.linear.z = 0.0
+        bodyOdom.twist.twist.angular.x = 0.0
+        bodyOdom.twist.twist.angular.y = 0.0
+        bodyOdom.twist.twist.angular.z = 0.0
         self.pubOdom.publish(bodyOdom)
 
         bodyImu = Imu()
-        
-        if self.pause_flag:
-            acc = np.array([0.0, 0.0, 9.81])
-        else:
-            acc = self.data.sensor('BodyAcc').data.copy()
-            
         bodyImu.header.stamp = self.node.get_clock().now().to_msg()
-        bodyImu.angular_velocity.x = float(angVel[0])
-        bodyImu.angular_velocity.y = float(angVel[1])
-        bodyImu.angular_velocity.z = float(angVel[2])
-        bodyImu.linear_acceleration.x = float(acc[0])
-        bodyImu.linear_acceleration.y = float(acc[1])
-        bodyImu.linear_acceleration.z = float(acc[2])
+        bodyImu.angular_velocity.x = 0.0
+        bodyImu.angular_velocity.y = 0.0
+        bodyImu.angular_velocity.z = 0.0
+        bodyImu.linear_acceleration.x = 0.0
+        bodyImu.linear_acceleration.y = 0.0
+        bodyImu.linear_acceleration.z = 9.81
         bodyImu.orientation.x = float(ori_new[0])
         bodyImu.orientation.y = float(ori_new[1])
         bodyImu.orientation.z = float(ori_new[2])
         bodyImu.orientation.w = float(ori_new[3])
-        bodyImu.orientation_covariance = [0.0, 0, 0, 0, 0.0, 0, 0, 0, 0.0]
-        bodyImu.angular_velocity_covariance = [0.0, 0, 0, 0, 0.0, 0, 0, 0, 0.0]
-        bodyImu.linear_acceleration_covariance = [0.0, 0, 0, 0, 0.0, 0, 0, 0, 0.0]
         self.pubImu.publish(bodyImu)
-
-        if not self.pause_flag:
-            publish_time = self.data.time
 
       # get framebuffer viewport
       viewport_width, viewport_height = glfw.get_framebuffer_size(
