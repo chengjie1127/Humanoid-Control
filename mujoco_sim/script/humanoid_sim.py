@@ -104,15 +104,17 @@ class HumanoidSim(MuJoCoBase):
     while not glfw.window_should_close(self.window):
       simstart = self.data.time
 
-      while (self.data.time - simstart <= 1.0/60.0 and not self.pause_flag):
-
-        if (time.time() - sim_epoch_start >= 1.0 / self.sim_rate):
-          # MIT control
-          self.data.ctrl[:] = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
-          # Step simulation environment
-          mj.mj_step(self.model, self.data)
-          sim_epoch_start = time.time()
-
+      while (self.data.time - simstart < 1.0/60.0):
+        if not self.pause_flag:
+          if (time.time() - sim_epoch_start >= 1.0 / self.sim_rate):
+            # MIT control
+            self.data.ctrl[:] = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
+            # Step simulation environment
+            mj.mj_step(self.model, self.data)
+            sim_epoch_start = time.time()
+        else:
+            # Advance local time frame minimally without physics steps so the outer GUI renders and rclpy updates
+            simstart -= 1.0/60.0
         
         if (self.data.time - publish_time >= 1.0 / 500.0):
           # * Publish joint positions and velocities
@@ -120,7 +122,7 @@ class HumanoidSim(MuJoCoBase):
           # get last 12 element of qpos and qvel
           qp = self.data.qpos[-12:].copy()
           qv = self.data.qvel[-12:].copy()
-          jointsPosVel.data = np.concatenate((qp,qv))
+          jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
           self.pubJoints.publish(jointsPosVel)
           # * Publish body pose
@@ -220,11 +222,11 @@ class HumanoidSim(MuJoCoBase):
 
         bodyImu = Imu()
         bodyImu.header.stamp = self.node.get_clock().now().to_msg()
-        bodyImu.angular_velocity.x = 0
-        bodyImu.angular_velocity.y = 0
-        bodyImu.angular_velocity.z = 0
-        bodyImu.linear_acceleration.x = 0
-        bodyImu.linear_acceleration.y = 0
+        bodyImu.angular_velocity.x = 0.0
+        bodyImu.angular_velocity.y = 0.0
+        bodyImu.angular_velocity.z = 0.0
+        bodyImu.linear_acceleration.x = 0.0
+        bodyImu.linear_acceleration.y = 0.0
         bodyImu.linear_acceleration.z = 9.81
         bodyImu.orientation.x = ori[1]
         bodyImu.orientation.y = ori[2]
