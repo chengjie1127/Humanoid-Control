@@ -3,6 +3,7 @@ import mujoco as mj
 from mujoco.glfw import glfw
 import rclpy
 from std_msgs.msg import Bool 
+import time
 
 class MuJoCoBase():
     def __init__(self, xml_path, node):
@@ -14,7 +15,15 @@ class MuJoCoBase():
         self.lastx = 0
         self.lasty = 0
         self.pause_flag = True
+        self.controller_ready = False
+        self.controller_ready_time = None
+        self.ready_hold_duration = 2.0
+        self.pending_unpause_request = False
+        self.space_pressed = False
+        self.keyboard_enable_time = time.time() + 2.0
         self.pubSimState = self.node.create_publisher(Bool, '/pauseFlag', 10)
+        self.node.create_subscription(Bool, '/pauseFlag', self.pause_callback, 10)
+        self.node.create_subscription(Bool, '/controllerReady', self.controller_ready_callback, 10)
         # MuJoCo data structures
         self.model = mj.MjModel.from_xml_path(xml_path)  # MuJoCo model
         self.data = mj.MjData(self.model)                # MuJoCo data
@@ -40,12 +49,51 @@ class MuJoCoBase():
         glfw.set_mouse_button_callback(self.window, self.mouse_button)
         glfw.set_scroll_callback(self.window, self.scroll)
 
+    def pause_callback(self, msg):
+        requested_pause = bool(msg.data)
+        if not requested_pause and not self.can_run_simulation():
+            self.pause_flag = True
+            self.pending_unpause_request = True
+            return
+        self.pending_unpause_request = False
+        self.pause_flag = requested_pause
+
+    def controller_ready_callback(self, msg):
+        was_ready = self.controller_ready
+        self.controller_ready = bool(msg.data)
+        if self.controller_ready and not was_ready:
+            self.controller_ready_time = time.time()
+            self.node.get_logger().info('Controller initialization finished.')
+
+    def can_run_simulation(self):
+        if not self.controller_ready or self.controller_ready_time is None:
+            return False
+        return time.time() >= self.controller_ready_time + self.ready_hold_duration
+
+    def release_pending_unpause_if_ready(self):
+        if self.pending_unpause_request and self.can_run_simulation():
+            self.pending_unpause_request = False
+            self.pause_flag = False
+            self.node.get_logger().info('Applying queued unpause request.')
+
     def keyboard(self, window, key, scancode, act, mods):
         if act == glfw.PRESS and key == glfw.KEY_BACKSPACE:
             mj.mj_resetData(self.model, self.data)
             mj.mj_forward(self.model, self.data)
-        elif act ==glfw.PRESS and key== glfw.KEY_SPACE:
+        elif key == glfw.KEY_SPACE:
+            if time.time() < self.keyboard_enable_time:
+                self.space_pressed = False
+                return
+            if act == glfw.PRESS:
+                self.space_pressed = True
+                return
+            if act != glfw.RELEASE or not self.space_pressed:
+                return
+            self.space_pressed = False
             self.pause_flag = not self.pause_flag
+            if not self.pause_flag and not self.can_run_simulation():
+                self.pause_flag = True
+                self.node.get_logger().info('Unpause requested before controller startup settled; staying paused.')
             mj.mj_forward(self.model, self.data)
             simState = Bool()
             simState.data = self.pause_flag

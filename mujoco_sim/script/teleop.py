@@ -12,6 +12,14 @@ class KeyboardController:
         self.node = node
         self.publisher = node.create_publisher(Twist, '/cmd_vel', 1)
         self.twist_msg = Twist()
+        self.last_published_was_zero = False
+
+    def is_zero_command(self):
+        return (
+            self.twist_msg.linear.x == 0.0 and
+            self.twist_msg.linear.y == 0.0 and
+            self.twist_msg.angular.z == 0.0
+        )
 
     def on_press(self, key):
         try:
@@ -56,7 +64,10 @@ def main(args=None):
     def ros_publish():
         while rclpy.ok():
             try:
-                controller.publisher.publish(controller.twist_msg)
+                is_zero_command = controller.is_zero_command()
+                if (not is_zero_command) or (not controller.last_published_was_zero):
+                    controller.publisher.publish(controller.twist_msg)
+                    controller.last_published_was_zero = is_zero_command
                 time.sleep(1.0 / 150.0)
             except Exception:
                 break

@@ -23,6 +23,8 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <ocs2_msgs/msg/mpc_observation.hpp>
 
+#include <chrono>
+
 namespace humanoid_controller{
 using namespace ocs2;
 using namespace humanoid;
@@ -47,6 +49,9 @@ class humanoidController {
 
   void jointStateCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
   void ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg);
+  void publishStandCommand();
+  void publishDiagnosticStatus(bool fallbackMode, bool hasTorque = false, scalar_t torque0 = 0.0, scalar_t torque1 = 0.0,
+                               scalar_t torque2 = 0.0);
 
   // Interface
   std::shared_ptr<HumanoidInterface> HumanoidInterface_;
@@ -86,6 +91,14 @@ class humanoidController {
  private:
   std::thread mpcThread_;
   std::atomic_bool controllerRunning_{}, mpcRunning_{};
+  std::atomic_bool receivedJointState_{false}, receivedImu_{false};
+  std::chrono::steady_clock::time_point lastJointStateWallTime_{};
+  std::chrono::steady_clock::time_point lastImuWallTime_{};
+  std::chrono::steady_clock::time_point lastDiagnosticWallTime_{};
+  bool controlBlendStartInitialized_ = false;
+  bool initialStanceHoldActive_ = true;
+  scalar_t startupCommandBlendDuration_ = 2.0;
+  scalar_t controlBlendElapsedTime_ = 0.0;
   benchmark::RepeatedTimer mpcTimer_;
   benchmark::RepeatedTimer wbcTimer_;
   size_t jointNum_ = 12;

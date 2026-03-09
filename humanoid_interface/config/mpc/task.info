@@ -257,15 +257,15 @@ swingLegTask
 
 baseAngularTask 
 {
-    kp                   30
-    kd                   3
+  kp                   120
+  kd                   12
 }
 
 weight
 {
     swingLeg        100
-    baseAccel       1
-    contactForce    1
+  baseAccel       80
+  contactForce    10
 }
 
 ; State Estimation

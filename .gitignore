@@ -1,3 +1,7 @@
 humanoid-control/build/
+build/
 install/
 log/
+compile_commands.json
+.vscode/
+**/__pycache__/

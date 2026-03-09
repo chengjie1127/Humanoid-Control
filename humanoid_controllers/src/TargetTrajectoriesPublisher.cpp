@@ -38,7 +38,6 @@ TargetTrajectories targetPoseToTargetTrajectories(const vector_t& targetPose, co
 
   // desired state trajectory
   vector_t currentPose = observation.state.segment<6>(6);
-  currentPose(2) = COM_HEIGHT;
   currentPose(4) = 0;
   currentPose(5) = 0;
   vector_array_t stateTrajectory(2, vector_t::Zero(observation.state.size()));
@@ -78,7 +77,7 @@ TargetTrajectories cmdVelToTargetTrajectories(const vector_t& cmdVel, const Syst
     vector_t target(6);
     target(0) = currentPose(0) + cmdVelRot(0) * timeToTarget;
     target(1) = currentPose(1) + cmdVelRot(1) * timeToTarget;
-    target(2) = COM_HEIGHT;
+    target(2) = currentPose(2);
     target(3) = currentPose(3) + cmdVel(3) * timeToTarget;
     target(4) = 0;
     target(5) = 0;

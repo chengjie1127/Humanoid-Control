@@ -54,7 +54,7 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --symlink-install #i
 source install/setup.bash
 
 # To start simulation with the cheat state estimator.
-# Press SPACE on mujoco simulation window and input the gait command. 
+# After startup, explicitly unpause with /pauseFlag=false, then select a gait and send /cmd_vel.
 ros2 launch humanoid_controllers load_cheat_controller.launch.py
 
 # To start simulation with the normal state estimator.
@@ -63,6 +63,66 @@ ros2 launch humanoid_controllers load_normal_controller.launch.py
 # To start only the NMPC module and simulate with OCS2 dummy node (Useful for isolated testing of the NMPC, Gait changes, and OCS2 interface without MuJoCo physics)
 ros2 launch humanoid_dummy legged_robot_sqp.launch.py
 ```
+
+### Cheat Controller Startup Workflow (validated checkpoint)
+
+The current cheat-controller path has been validated with the MuJoCo simulator, the topic-based state estimator, and the OCS2 MPC/WBC stack.
+
+Recommended startup sequence:
+
+1. Build the workspace in `RelWithDebInfo` and source both the OCS2 workspace and this workspace.
+2. Launch the cheat-controller stack:
+
+   ```bash
+   ros2 launch humanoid_controllers load_cheat_controller.launch.py
+   ```
+
+3. Wait until the controller has finished initializing. The simulator now keeps physics paused until the controller reports ready, and it also applies an extra startup hold.
+4. Explicitly release pause after startup:
+
+   ```bash
+   ros2 topic pub --once /pauseFlag std_msgs/msg/Bool '{data: false}'
+   ```
+
+5. Select a gait with the gait command node.
+6. Send a nonzero `/cmd_vel` command to actually move. A gait switch alone is not sufficient for forward walking.
+
+Example walking trigger:
+
+```bash
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.2, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}'
+```
+
+Notes:
+
+- Explicit `/pauseFlag=false` is still the recommended operating procedure even though the simulator now supports queued unpause requests.
+- At startup, the controller holds a nominal stand posture while the planned mode remains `STANCE`.
+- The stand hold is released automatically when a non-`STANCE` gait is requested.
+- The idle teleop node no longer continuously overwrites `/cmd_vel` with zeros, so external velocity commands can take effect correctly.
+
+### Recent Stability Fixes in This Checkpoint
+
+This checkpoint includes several fixes that were required to get stable standing and walking handoff working reliably:
+
+- corrected MuJoCo free-joint quaternion initialization to MuJoCo `wxyz` ordering;
+- improved simulator startup initialization with `mj_forward()`;
+- added controller/simulator startup synchronization using `/controllerReady` and paused startup holdoff;
+- removed redundant foot-roll constraints for the 2-points-per-foot contact model;
+- preserved current COM height when `/cmd_vel` is zero instead of forcing unnecessary height motion;
+- increased torso/base angular stabilization in WBC tuning;
+- added controller-side initial stance hold for clean post-unpause standing;
+- changed command blending to use elapsed control period instead of ROS time, avoiding `use_sim_time=true` startup issues;
+- changed teleop publishing so idle zero commands do not mask external `/cmd_vel` inputs.
+
+### Simulated Robot Provenance
+
+The robot model in this repository appears to be a custom humanoid simulation/control stack rather than a clearly branded official platform. The code and assets show influence from:
+
+- BridgeDP `hunter-bipedal-control` / `EC-hunter80-v01`;
+- Qiayuan Liao's `legged_control` framework;
+- High-Torque / `Hector_Simulation` MuJoCo simulation assets.
+
+At the time of writing, the repository does not provide a definitive single commercial brand name for the simulated humanoid.
 
 The effect of the simulation is shown in the video provided in [this link](https://b23.tv/Jz3INC4). (Note: The video version is older, and the actual effect may vary depending on the latest code).
 

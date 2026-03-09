@@ -20,15 +20,24 @@
 #include <angles/angles.h>
 #include <humanoid_estimation/FromTopiceEstimate.h>
 #include <humanoid_estimation/LinearKalmanFilter.h>
+#include <humanoid_interface/common/utils.h>
 #include <humanoid_wbc/WeightedWbc.h>
+#include <array>
+#include <sstream>
 
 
 
 namespace humanoid_controller{
 using namespace ocs2;
 using namespace humanoid;
+
+namespace {
+constexpr std::array<float, 12> kStandKp = {80.0F, 60.0F, 80.0F, 80.0F, 4.0F, 4.0F, 80.0F, 60.0F, 80.0F, 80.0F, 4.0F, 4.0F};
+constexpr std::array<float, 12> kStandKd = {1.2F, 0.9F, 1.2F, 1.2F, 0.1F, 0.1F, 1.2F, 0.9F, 1.2F, 1.2F, 0.1F, 0.1F};
+}
+
 bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
-    controllerNh_ = controller_nh;
+  controllerNh_ = controller_nh;
   // Initialize OCS2
   std::string urdfFile;
   std::string taskFile;
@@ -45,6 +54,11 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   setupHumanoidInterface(taskFile, urdfFile, referenceFile, verbose);
   setupMpc();
   setupMrt();
+
+  CentroidalModelPinocchioMapping pinocchioMapping(HumanoidInterface_->getCentroidalModelInfo());
+  eeKinematicsPtr_ = std::make_shared<PinocchioEndEffectorKinematics>(
+      HumanoidInterface_->getPinocchioInterface(), pinocchioMapping, HumanoidInterface_->modelSettings().contactNames3DoF);
+
   // Visualization
   robotVisualizer_ = std::make_shared<HumanoidVisualizer>(HumanoidInterface_->getPinocchioInterface(),
                                                              HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
@@ -55,10 +69,18 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   // Hardware interface
   //TODO: setup hardware controller interface
   //create a ROS subscriber to receive the joint pos and vel
-    jointPos_ = vector_t::Zero(jointNum_);
-    jointPos_ << 0.0, 0.0, 0.37, 0.90, 0.53, 0, 0.0, 0.0, 0.37, 0.90, 0.53, 0;
-    jointVel_ = vector_t::Zero(jointNum_);
-    quat_ = Eigen::Quaternion<scalar_t>(1, 0, 0, 0);
+  jointPos_ = vector_t::Zero(jointNum_);
+  jointPos_ << 0.05, 0.0, 0.37, 0.90, 0.53, 0, -0.05, 0.0, 0.37, 0.90, 0.53, 0;
+  jointVel_ = vector_t::Zero(jointNum_);
+  quat_ = Eigen::Quaternion<scalar_t>(1, 0, 0, 0);
+  angularVel_.setZero();
+  linearAccel_.setZero();
+  orientationCovariance_.setZero();
+  angularVelCovariance_.setZero();
+  linearAccelCovariance_.setZero();
+  lastJointStateWallTime_ = std::chrono::steady_clock::now();
+  lastImuWallTime_ = std::chrono::steady_clock::now();
+  lastDiagnosticWallTime_ = std::chrono::steady_clock::now();
   jointPosVelSub_ = controllerNh_->create_subscription<std_msgs::msg::Float32MultiArray>("/jointsPosVel", 10, std::bind(&humanoidController::jointStateCallback, this, std::placeholders::_1));
   imuSub_ = controllerNh_->create_subscription<sensor_msgs::msg::Imu>("/imu", 10, std::bind(&humanoidController::ImuCallback, this, std::placeholders::_1));
   targetTorquePub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetTorque", 10);
@@ -90,6 +112,8 @@ void humanoidController::jointStateCallback(const std_msgs::msg::Float32MultiArr
       jointPos_(i) = msg->data[i];
       jointVel_(i) = msg->data[i + jointNum_];
   }
+  receivedJointState_ = true;
+  lastJointStateWallTime_ = std::chrono::steady_clock::now();
 }
 
 void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg) {
@@ -108,9 +132,17 @@ void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr
     linearAccelCovariance_ << msg->linear_acceleration_covariance[0], msg->linear_acceleration_covariance[1], msg->linear_acceleration_covariance[2],
             msg->linear_acceleration_covariance[3], msg->linear_acceleration_covariance[4], msg->linear_acceleration_covariance[5],
             msg->linear_acceleration_covariance[6], msg->linear_acceleration_covariance[7], msg->linear_acceleration_covariance[8];
+    receivedImu_ = true;
+    lastImuWallTime_ = std::chrono::steady_clock::now();
 }
 
 void humanoidController::starting(const rclcpp::Time& time) {
+  while (!(receivedJointState_ && receivedImu_) && rclcpp::ok()) {
+    publishDiagnosticStatus(true);
+    publishStandCommand();
+    rclcpp::sleep_for(std::chrono::milliseconds(2));
+  }
+
   // Initial state
   currentObservation_.state = vector_t::Zero(HumanoidInterface_->getCentroidalModelInfo().stateDim);
   currentObservation_.state(8) = 0.976;
@@ -127,88 +159,135 @@ void humanoidController::starting(const rclcpp::Time& time) {
   mpcMrtInterface_->getReferenceManager().setTargetTrajectories(target_trajectories);
   RCLCPP_INFO_STREAM(controllerNh_->get_logger(), "Waiting for the initial policy ...");
   while (!mpcMrtInterface_->initialPolicyReceived() && rclcpp::ok()) {
-    mpcMrtInterface_->advanceMpc();
+    publishDiagnosticStatus(true);
+    publishStandCommand();
+    try {
+      mpcMrtInterface_->advanceMpc();
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR_STREAM(controllerNh_->get_logger(), "[humanoid Controller] advanceMpc exception during starting: " << e.what());
+    }
     rclcpp::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(1.0 / HumanoidInterface_->mpcSettings().mrtDesiredFrequency_)));
   }
   RCLCPP_INFO_STREAM(controllerNh_->get_logger(), "Initial policy has been received.");
 
   mpcRunning_ = true;
+  controlBlendStartInitialized_ = true;
+  controlBlendElapsedTime_ = 0.0;
+  initialStanceHoldActive_ = true;
 }
 
 void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration& period) {  
-
-  // State Estimate
-  updateStateEstimation(time, period);
-
-  // Update the current state of the system
-  mpcMrtInterface_->setCurrentObservation(currentObservation_);
-
-  // Load the latest MPC policy
-  mpcMrtInterface_->updatePolicy();
-
-  // Evaluate the current policy
-  vector_t optimizedState, optimizedInput;
-  mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
-
-  // Whole body control
-  currentObservation_.input = optimizedInput;
-
-  wbcTimer_.startTimer();
-  vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
-  wbcTimer_.endTimer();
-
-  const vector_t& torque = x.tail(jointNum_);
-  const vector_t& wbc_planned_joint_acc = x.segment(6, jointNum_);
-  const vector_t& wbc_planned_body_acc = x.head(6);
-  const vector_t& wbc_planned_contact_force = x.segment(6 + jointNum_, wbc_->getContactForceSize());
-
-
-  vector_t posDes = centroidal_model::getJointAngles(optimizedState, HumanoidInterface_->getCentroidalModelInfo());
-  vector_t velDes = centroidal_model::getJointVelocities(optimizedInput, HumanoidInterface_->getCentroidalModelInfo());
-
-  scalar_t dt = period.seconds();
-  posDes = posDes + 0.5 * wbc_planned_joint_acc * dt * dt;
-  velDes = velDes + wbc_planned_joint_acc * dt;
-
-  // Safety check, if failed, stop the controller
-  if (!safetyChecker_->check(currentObservation_, optimizedState, optimizedInput)) {
-    RCLCPP_ERROR_STREAM(controllerNh_->get_logger(), "[humanoid Controller] Safety check failed, stopping the controller.");
-    //TODO: send the stop command to hardware interface
+  if (!(receivedJointState_ && receivedImu_)) {
+    publishDiagnosticStatus(true);
+    publishStandCommand();
     return;
   }
 
-    std_msgs::msg::Float32MultiArray targetTorqueMsg;
-    for (int i1 = 0; i1 < 12; ++i1) {
-        targetTorqueMsg.data.push_back(torque(i1));
+  try {
+    // State Estimate
+    updateStateEstimation(time, period);
+
+    // Update the current state of the system
+    mpcMrtInterface_->setCurrentObservation(currentObservation_);
+
+    // Load the latest MPC policy
+    mpcMrtInterface_->updatePolicy();
+
+    // Evaluate the current policy
+    vector_t optimizedState, optimizedInput;
+    mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
+
+    // Whole body control
+    currentObservation_.input = optimizedInput;
+
+    wbcTimer_.startTimer();
+    vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
+    wbcTimer_.endTimer();
+
+    const vector_t& torque = x.tail(jointNum_);
+    const vector_t& wbc_planned_joint_acc = x.segment(6, jointNum_);
+    const vector_t& wbc_planned_body_acc = x.head(6);
+    const vector_t& wbc_planned_contact_force = x.segment(6 + jointNum_, wbc_->getContactForceSize());
+
+
+    vector_t posDes = centroidal_model::getJointAngles(optimizedState, HumanoidInterface_->getCentroidalModelInfo());
+    vector_t velDes = centroidal_model::getJointVelocities(optimizedInput, HumanoidInterface_->getCentroidalModelInfo());
+
+    scalar_t dt = period.seconds();
+    posDes = posDes + 0.5 * wbc_planned_joint_acc * dt * dt;
+    velDes = velDes + wbc_planned_joint_acc * dt;
+
+    if (initialStanceHoldActive_ && plannedMode_ != ModeNumber::STANCE) {
+      initialStanceHoldActive_ = false;
+      controlBlendStartInitialized_ = true;
+      controlBlendElapsedTime_ = 0.0;
     }
-    //output targetTorqueMsg
-//    std::cerr << "targetTorqueMsg: " << targetTorqueMsg << std::endl;
-    std_msgs::msg::Float32MultiArray targetPosMsg;
-    for (int i1 = 0; i1 < 12; ++i1) {
-        targetPosMsg.data.push_back(posDes(i1));
+
+    // Safety check, if failed, stop the controller
+    if (!safetyChecker_->check(currentObservation_, optimizedState, optimizedInput)) {
+      RCLCPP_ERROR_STREAM(controllerNh_->get_logger(), "[humanoid Controller] Safety check failed, stopping the controller.");
+      publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
+      publishStandCommand();
+      //TODO: send the stop command to hardware interface
+      return;
     }
-    std_msgs::msg::Float32MultiArray targetVelMsg;
-    for (int i1 = 0; i1 < 12; ++i1) {
-        targetVelMsg.data.push_back(velDes(i1));
+
+    if (initialStanceHoldActive_ && plannedMode_ == ModeNumber::STANCE) {
+      publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
+      publishStandCommand();
+
+      robotVisualizer_->update(currentObservation_, mpcMrtInterface_->getPolicy(), mpcMrtInterface_->getCommand());
+      observationPublisher_->publish(ros_msg_conversions::createObservationMsg(currentObservation_));
+      return;
     }
-    targetTorquePub_->publish(targetTorqueMsg);
-    targetPosPub_->publish(targetPosMsg);
-    targetVelPub_->publish(targetVelMsg);
-    std_msgs::msg::Float32MultiArray targetKp;
-    std_msgs::msg::Float32MultiArray targetKd;
 
-    targetKp.data = {80.0, 60.0, 80.0, 80.0, 4.0, 4.0, 80.0, 60.0, 80.0, 80.0, 4.0, 4.0};
-    targetKd.data = {1.2, 0.9, 1.2, 1.2, 0.1, 0.1, 1.2, 0.9, 1.2, 1.2, 0.1, 0.1};
+    publishDiagnosticStatus(false, true, torque(0), torque(1), torque(2));
 
-   
-    targetKpPub_->publish(targetKp);
-    targetKdPub_->publish(targetKd);
+      scalar_t commandBlend = 1.0;
+      if (controlBlendStartInitialized_) {
+        controlBlendElapsedTime_ = std::min(controlBlendElapsedTime_ + period.seconds(), startupCommandBlendDuration_);
+        commandBlend = std::clamp(controlBlendElapsedTime_ / startupCommandBlendDuration_, 0.0, 1.0);
+      }
 
-    // Visualization
-  robotVisualizer_->update(currentObservation_, mpcMrtInterface_->getPolicy(), mpcMrtInterface_->getCommand());
+        std_msgs::msg::Float32MultiArray targetTorqueMsg;
+      for (int i1 = 0; i1 < 12; ++i1) {
+          targetTorqueMsg.data.push_back(static_cast<float>(commandBlend * torque(i1)));
+      }
+      //output targetTorqueMsg
+  //    std::cerr << "targetTorqueMsg: " << targetTorqueMsg << std::endl;
+      std_msgs::msg::Float32MultiArray targetPosMsg;
+      for (int i1 = 0; i1 < 12; ++i1) {
+          const scalar_t blendedPos = (1.0 - commandBlend) * defalutJointPos_(i1) + commandBlend * posDes(i1);
+          targetPosMsg.data.push_back(static_cast<float>(blendedPos));
+      }
+      std_msgs::msg::Float32MultiArray targetVelMsg;
+      for (int i1 = 0; i1 < 12; ++i1) {
+          targetVelMsg.data.push_back(static_cast<float>(commandBlend * velDes(i1)));
+      }
+      targetTorquePub_->publish(targetTorqueMsg);
+      targetPosPub_->publish(targetPosMsg);
+      targetVelPub_->publish(targetVelMsg);
+      std_msgs::msg::Float32MultiArray targetKp;
+      std_msgs::msg::Float32MultiArray targetKd;
 
-  // Publish the observation. Only needed for the command interface
-  observationPublisher_->publish(ros_msg_conversions::createObservationMsg(currentObservation_));
+      targetKp.data.assign(kStandKp.begin(), kStandKp.end());
+      targetKd.data.assign(kStandKd.begin(), kStandKd.end());
+
+    
+      targetKpPub_->publish(targetKp);
+      targetKdPub_->publish(targetKd);
+
+      // Visualization
+    robotVisualizer_->update(currentObservation_, mpcMrtInterface_->getPolicy(), mpcMrtInterface_->getCommand());
+
+    // Publish the observation. Only needed for the command interface
+    observationPublisher_->publish(ros_msg_conversions::createObservationMsg(currentObservation_));
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR_STREAM(controllerNh_->get_logger(), "[humanoid Controller] update exception: " << e.what());
+    publishDiagnosticStatus(true);
+    publishStandCommand();
+    return;
+  }
 }
 
 void humanoidController::updateStateEstimation(const rclcpp::Time& time, const rclcpp::Duration& period) {
@@ -244,6 +323,73 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   //  currentObservation_.mode = stateEstimate_->getMode();
   //TODO: 暂时用plannedMode_代替，需要在接触传感器可靠之后修改为stateEstimate_->getMode()
   currentObservation_.mode =  plannedMode_;
+}
+
+void humanoidController::publishStandCommand() {
+  std_msgs::msg::Float32MultiArray targetTorqueMsg;
+  targetTorqueMsg.data.assign(jointNum_, 0.0F);
+
+  std_msgs::msg::Float32MultiArray targetPosMsg;
+  targetPosMsg.data.reserve(jointNum_);
+  for (size_t i = 0; i < jointNum_; ++i) {
+    targetPosMsg.data.push_back(static_cast<float>(defalutJointPos_(i)));
+  }
+
+  std_msgs::msg::Float32MultiArray targetVelMsg;
+  targetVelMsg.data.assign(jointNum_, 0.0F);
+
+  std_msgs::msg::Float32MultiArray targetKpMsg;
+  targetKpMsg.data.assign(kStandKp.begin(), kStandKp.end());
+  std_msgs::msg::Float32MultiArray targetKdMsg;
+  targetKdMsg.data.assign(kStandKd.begin(), kStandKd.end());
+
+  targetTorquePub_->publish(targetTorqueMsg);
+  targetPosPub_->publish(targetPosMsg);
+  targetVelPub_->publish(targetVelMsg);
+  targetKpPub_->publish(targetKpMsg);
+  targetKdPub_->publish(targetKdMsg);
+}
+
+void humanoidController::publishDiagnosticStatus(bool fallbackMode, bool hasTorque, scalar_t torque0, scalar_t torque1, scalar_t torque2) {
+  const auto wallNow = std::chrono::steady_clock::now();
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(wallNow - lastDiagnosticWallTime_).count() < 200) {
+    return;
+  }
+  lastDiagnosticWallTime_ = wallNow;
+
+  const auto contactFlag = modeNumber2StanceLeg(plannedMode_);
+  const auto closedContacts = numberOfClosedContacts(contactFlag);
+  const auto jointAgeMs = std::chrono::duration_cast<std::chrono::milliseconds>(wallNow - lastJointStateWallTime_).count();
+  const auto imuAgeMs = std::chrono::duration_cast<std::chrono::milliseconds>(wallNow - lastImuWallTime_).count();
+
+  std::ostringstream contactFlagsStream;
+  contactFlagsStream << "[";
+  for (size_t i = 0; i < contactFlag.size(); ++i) {
+    contactFlagsStream << (contactFlag[i] ? 1 : 0);
+    if (i + 1 < contactFlag.size()) {
+      contactFlagsStream << ",";
+    }
+  }
+  contactFlagsStream << "]";
+
+  std::ostringstream torqueStream;
+  if (hasTorque) {
+    torqueStream << "[" << torque0 << ", " << torque1 << ", " << torque2 << "]";
+  } else {
+    torqueStream << "[n/a, n/a, n/a]";
+  }
+
+  RCLCPP_INFO_STREAM(
+      controllerNh_->get_logger(),
+      "[CtrlDiag] fallback=" << (fallbackMode ? "1" : "0")
+                             << " sensors_ready=" << ((receivedJointState_ && receivedImu_) ? "1" : "0")
+                             << " joint_age_ms=" << jointAgeMs
+                             << " imu_age_ms=" << imuAgeMs
+                             << " quat_wxyz=[" << quat_.w() << ", " << quat_.x() << ", " << quat_.y() << ", " << quat_.z() << "]"
+                             << " torque012=" << torqueStream.str()
+                             << " planned_mode=" << plannedMode_
+                             << " contacts_closed=" << closedContacts
+                             << " contact_flags=" << contactFlagsStream.str());
 }
 
 humanoidController::~humanoidController() {

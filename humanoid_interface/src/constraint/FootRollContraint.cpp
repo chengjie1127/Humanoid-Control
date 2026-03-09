@@ -20,8 +20,7 @@ namespace humanoid {
                 info_(rhs.info_) {}
 
     bool FootRollConstraint::isActive(scalar_t time) const {
-//        return !referenceManagerPtr_->getContactFlags(time)[contactPointIndex_];
-        return true;
+        return referenceManagerPtr_->getContactFlags(time)[contactPointIndex_];
     }
 
 

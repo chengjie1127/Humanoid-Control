@@ -5,6 +5,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 import os
 
+
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
@@ -13,8 +14,7 @@ def generate_launch_description():
         DeclareLaunchArgument('urdfFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_control.urdf'])),
         DeclareLaunchArgument('urdfFileOrigin', default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_origin.urdf'])),
         DeclareLaunchArgument('gaitCommandFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/gait.info'])),
-        
-        # Append OCS2 library paths to LD_LIBRARY_PATH so the nodes can find them at runtime
+
         AppendEnvironmentVariable(
             'LD_LIBRARY_PATH',
             ':'.join([
@@ -43,7 +43,7 @@ def generate_launch_description():
                 'use_sim_time': LaunchConfiguration('use_sim_time')
             }]
         ),
-        
+
         Node(
             package='humanoid_controllers',
             executable='humanoid_target_trajectories_publisher',
@@ -58,12 +58,13 @@ def generate_launch_description():
                 'use_sim_time': LaunchConfiguration('use_sim_time')
             }]
         ),
-        
+
         Node(
             package='humanoid_controllers',
             executable='cheat_controller_node',
             name='cheat_controller',
             output='screen',
+            prefix='gdb -q -batch -ex run -ex "thread apply all bt" --args',
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
@@ -73,7 +74,7 @@ def generate_launch_description():
                 'use_sim_time': LaunchConfiguration('use_sim_time')
             }]
         ),
-        
+
         Node(
             package='mujoco_sim',
             executable='humanoid_sim.py',
@@ -81,7 +82,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
-        
+
         Node(
             package='mujoco_sim',
             executable='teleop.py',

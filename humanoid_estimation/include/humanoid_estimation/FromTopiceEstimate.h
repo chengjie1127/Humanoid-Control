@@ -36,6 +36,9 @@ private:
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_;
   realtime_tools::RealtimeBuffer<nav_msgs::msg::Odometry> buffer_;
+  Eigen::Quaternion<scalar_t> sensorToBaseQuat_ = Eigen::Quaternion<scalar_t>::Identity();
+  bool autoZeroInitialPitch_ = true;
+  bool initialPitchOffsetInitialized_ = false;
 };
 
 }  // namespace humanoid

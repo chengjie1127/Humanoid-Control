@@ -5,17 +5,50 @@ from mujoco_base import MuJoCoBase
 from mujoco.glfw import glfw
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import Float32MultiArray,Bool
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 import time
-from scipy.spatial.transform import Rotation as R
 
-init_joint_pos = np.array([0.0, 0.0, 0.37, 0.90, 0.53, 0, 0.0, 0.0, 0.37, 0.90, 0.53, 0])
+
+def euler_xyz_to_quat_xyzw(euler_xyz):
+  roll, pitch, yaw = euler_xyz
+  cr = np.cos(roll * 0.5)
+  sr = np.sin(roll * 0.5)
+  cp = np.cos(pitch * 0.5)
+  sp = np.sin(pitch * 0.5)
+  cy = np.cos(yaw * 0.5)
+  sy = np.sin(yaw * 0.5)
+  return np.array([
+      sr * cp * cy + cr * sp * sy,
+      cr * sp * cy - sr * cp * sy,
+      cr * cp * sy + sr * sp * cy,
+      cr * cp * cy - sr * sp * sy,
+  ])
+
+
+def quat_wxyz_to_euler_xyz(quat_wxyz):
+  w, x, y, z = quat_wxyz
+  sinr_cosp = 2.0 * (w * x + y * z)
+  cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+  roll = np.arctan2(sinr_cosp, cosr_cosp)
+
+  sinp = 2.0 * (w * y - z * x)
+  pitch = np.arcsin(np.clip(sinp, -1.0, 1.0))
+
+  siny_cosp = 2.0 * (w * z + x * y)
+  cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+  yaw = np.arctan2(siny_cosp, cosy_cosp)
+  return np.array([roll, pitch, yaw])
+
+init_joint_pos = np.array([0.05, 0.0, 0.37, 0.90, 0.53, 0, -0.05, 0.0, 0.37, 0.90, 0.53, 0])
 init_base_pos = np.array([0, 0, 1.225])
 init_base_eular_zyx = np.array([0.0, -0., 0.0])
 imu_eular_bias = np.array([0.0, 0.0, 0.0])
+default_stand_kp = np.array([80.0, 60.0, 80.0, 80.0, 4.0, 4.0, 80.0, 60.0, 80.0, 80.0, 4.0, 4.0])
+default_stand_kd = np.array([1.2, 0.9, 1.2, 1.2, 0.1, 0.1, 1.2, 0.9, 1.2, 1.2, 0.1, 0.1])
 
 class HumanoidSim(MuJoCoBase):
   def __init__(self, xml_path, node):
@@ -34,30 +67,38 @@ class HumanoidSim(MuJoCoBase):
     self.targetPos = init_joint_pos
     self.targetVel = np.zeros(12)
     self.targetTorque = np.zeros(12)
-    self.targetKp = np.zeros(12)
-    self.targetKd = np.zeros(12)
+    self.targetKp = default_stand_kp.copy()
+    self.targetKd = default_stand_kd.copy()
 
     self.pubJoints = self.node.create_publisher(Float32MultiArray, '/jointsPosVel', 10)
     self.pubOdom = self.node.create_publisher(Odometry, '/ground_truth/state', 10)
     self.pubImu = self.node.create_publisher(Imu, '/imu', 10)
     self.pubRealTorque = self.node.create_publisher(Float32MultiArray, '/realTorque', 10)
 
-    self.node.create_subscription(Float32MultiArray, "/targetTorque", self.targetTorqueCallback, 10) 
-    self.node.create_subscription(Float32MultiArray, "/targetPos", self.targetPosCallback, 10) 
-    self.node.create_subscription(Float32MultiArray, "/targetVel", self.targetVelCallback, 10)
-    self.node.create_subscription(Float32MultiArray, "/targetKp", self.targetKpCallback, 10)
-    self.node.create_subscription(Float32MultiArray, "/targetKd", self.targetKdCallback, 10)
+    self.node.create_subscription(Float32MultiArray, "/targetTorque", self.targetTorqueCallback, qos_profile_sensor_data) 
+    self.node.create_subscription(Float32MultiArray, "/targetPos", self.targetPosCallback, qos_profile_sensor_data) 
+    self.node.create_subscription(Float32MultiArray, "/targetVel", self.targetVelCallback, qos_profile_sensor_data)
+    self.node.create_subscription(Float32MultiArray, "/targetKp", self.targetKpCallback, qos_profile_sensor_data)
+    self.node.create_subscription(Float32MultiArray, "/targetKd", self.targetKdCallback, qos_profile_sensor_data)
     #set the initial joint position
     self.data.qpos[:3] = init_base_pos
-    # init rpy to init quaternion
-    self.data.qpos[3:7] = R.from_euler('xyz', init_base_eular_zyx).as_quat()
+    # MuJoCo free-joint quaternion in qpos is wxyz, while scipy returns xyzw.
+    base_quat_xyzw = euler_xyz_to_quat_xyzw(init_base_eular_zyx)
+    self.data.qpos[3:7] = np.array([
+      base_quat_xyzw[3],
+      base_quat_xyzw[0],
+      base_quat_xyzw[1],
+      base_quat_xyzw[2],
+    ])
     self.data.qpos[-12:] = init_joint_pos
 
-    self.data.qvel[:3] = np.array([0, 0, 0])
-    self.data.qvel[-12:] = np.zeros(12)
+    self.data.qvel[:] = 0.0
 
-    # * show the model
-    mj.mj_step(self.model, self.data)
+    # Align the floating base vertically so the support feet start in contact with the ground.
+    self._snap_base_to_ground()
+
+    # Initialize kinematics and sensors without advancing physics.
+    mj.mj_forward(self.model, self.data)
     # enable contact force visualization
     self.opt.flags[mj.mjtVisFlag.mjVIS_CONTACTFORCE] = True
 
@@ -69,6 +110,83 @@ class HumanoidSim(MuJoCoBase):
     mj.mjv_updateScene(self.model, self.data, self.opt, None, self.cam,
                         mj.mjtCatBit.mjCAT_ALL.value, self.scene)
     mj.mjr_render(viewport, self.scene, self.context)
+
+  def _geom_vertical_extent(self, geom_index):
+    geom_type = self.model.geom_type[geom_index]
+    geom_size = self.model.geom_size[geom_index]
+    geom_rot = self.data.geom_xmat[geom_index].reshape(3, 3)
+    world_z_in_local = geom_rot[2, :]
+
+    if geom_type == mj.mjtGeom.mjGEOM_BOX:
+      return (np.abs(world_z_in_local[0]) * geom_size[0] +
+              np.abs(world_z_in_local[1]) * geom_size[1] +
+              np.abs(world_z_in_local[2]) * geom_size[2])
+
+    if geom_type == mj.mjtGeom.mjGEOM_SPHERE:
+      return geom_size[0]
+
+    if geom_type == mj.mjtGeom.mjGEOM_CAPSULE or geom_type == mj.mjtGeom.mjGEOM_CYLINDER:
+      radius = geom_size[0]
+      half_length = geom_size[1]
+      axis_alignment = np.abs(world_z_in_local[2])
+      radial_alignment = np.sqrt(max(0.0, 1.0 - axis_alignment * axis_alignment))
+      return radius * radial_alignment + half_length * axis_alignment
+
+    if geom_type == mj.mjtGeom.mjGEOM_ELLIPSOID:
+      return np.sqrt(np.sum((geom_size[:3] * world_z_in_local[:3]) ** 2))
+
+    return float(np.max(geom_size[:3]))
+
+  def _lowest_collidable_point_z(self):
+    lowest_point_z = np.inf
+    for geom_index in range(self.model.ngeom):
+      if self.model.geom_bodyid[geom_index] == 0:
+        continue
+      if self.model.geom_contype[geom_index] == 0 and self.model.geom_conaffinity[geom_index] == 0:
+        continue
+
+      geom_world_pos = self.data.geom_xpos[geom_index]
+      lowest_point_z = min(lowest_point_z, geom_world_pos[2] - self._geom_vertical_extent(geom_index))
+
+    return lowest_point_z
+
+  def _support_geom_bottoms(self):
+    support_body_names = {"leg_l6_link", "leg_r6_link"}
+    support_bottoms = []
+    for geom_index in range(self.model.ngeom):
+      if self.model.geom_contype[geom_index] == 0 and self.model.geom_conaffinity[geom_index] == 0:
+        continue
+
+      body_name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_BODY, self.model.geom_bodyid[geom_index])
+      if body_name not in support_body_names:
+        continue
+
+      geom_world_pos = self.data.geom_xpos[geom_index]
+      support_bottoms.append(geom_world_pos[2] - self._geom_vertical_extent(geom_index))
+    return support_bottoms
+
+  def _snap_base_to_ground(self, desired_penetration=5.0e-4):
+    mj.mj_forward(self.model, self.data)
+    support_bottoms = self._support_geom_bottoms()
+    if support_bottoms:
+      base_shift = max(support_bottoms) + desired_penetration
+    else:
+      lowest_point_z = self._lowest_collidable_point_z()
+      if not np.isfinite(lowest_point_z):
+        return
+      base_shift = lowest_point_z + desired_penetration
+
+    if not np.isfinite(base_shift):
+      return
+
+    self.data.qpos[2] -= base_shift
+    self.data.qvel[:] = 0.0
+    mj.mj_forward(self.model, self.data)
+    support_bottoms = self._support_geom_bottoms()
+    if support_bottoms:
+      print(f"[HumanoidSim] Startup base_z adjusted to {self.data.qpos[2]:.6f}; support geom bottoms={support_bottoms}")
+    else:
+      print(f"[HumanoidSim] Startup base_z adjusted to {self.data.qpos[2]:.6f} so lowest collidable geom starts at z={self._lowest_collidable_point_z():.6f}")
     
 
   def targetTorqueCallback(self, data):
@@ -103,10 +221,12 @@ class HumanoidSim(MuJoCoBase):
     sim_epoch_start = time.time()
     
     while not glfw.window_should_close(self.window):
+      self.release_pending_unpause_if_ready()
       simstart = self.data.time
+      simulation_active = (not self.pause_flag) and self.can_run_simulation()
 
       while (self.data.time - simstart < 1.0/60.0):
-        if not self.pause_flag:
+        if simulation_active:
           if (time.time() - sim_epoch_start >= 1.0 / self.sim_rate):
             # MIT control
             self.data.ctrl[:] = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
@@ -134,10 +254,9 @@ class HumanoidSim(MuJoCoBase):
           #add imu bias
           ori = self.data.sensor('BodyQuat').data.copy()
           # Ensure correct scipy XYZW quaternion mapping from MuJoCo WXYZ
-          ori_scipy = np.array([ori[1], ori[2], ori[3], ori[0]])
-          eul = R.from_quat(ori_scipy).as_euler('xyz')
+          eul = quat_wxyz_to_euler_xyz(ori)
           eul += imu_eular_bias
-          ori_new = R.from_euler('xyz', eul).as_quat()
+          ori_new = euler_xyz_to_quat_xyzw(eul)
 
           vel = self.data.qvel[:3].copy()
           angVel = self.data.sensor('BodyGyro').data.copy()
@@ -186,7 +305,7 @@ class HumanoidSim(MuJoCoBase):
 
       if self.data.time >= self.simend:
           break
-      if self.pause_flag:
+      if not simulation_active:
         # publish the state even if the simulation is paused
         # * Publish joint positions and velocities
         jointsPosVel = Float32MultiArray()
@@ -202,10 +321,9 @@ class HumanoidSim(MuJoCoBase):
 
         #add imu bias
         ori = self.data.sensor('BodyQuat').data.copy()
-        ori_scipy = np.array([ori[1], ori[2], ori[3], ori[0]])
-        eul = R.from_quat(ori_scipy).as_euler('xyz')
+        eul = quat_wxyz_to_euler_xyz(ori)
         eul += imu_eular_bias
-        ori_new = R.from_euler('xyz', eul).as_quat()
+        ori_new = euler_xyz_to_quat_xyzw(eul)
 
         vel = self.data.qvel[:3].copy()
         angVel = self.data.sensor('BodyGyro').data.copy()

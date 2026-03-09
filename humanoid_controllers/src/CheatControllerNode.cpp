@@ -3,45 +3,60 @@
 //
 
 #include "humanoid_controllers/humanoidController.h"
+#include <atomic>
 #include <thread>
 
 using Duration = std::chrono::duration<double>;
 using Clock = std::chrono::high_resolution_clock;
 
-bool pause_flag = false;
+std::atomic_bool pause_flag{true};
 
 void pauseCallback(const std_msgs::msg::Bool::ConstSharedPtr& msg){
-    pause_flag = msg->data;
-    std::cerr << "pause_flag: " << pause_flag << std::endl;
+    pause_flag.store(msg->data, std::memory_order_relaxed);
+    std::cerr << "pause_flag: " << pause_flag.load(std::memory_order_relaxed) << std::endl;
 }
 
 int main(int argc, char** argv){
     rclcpp::Duration elapsedTime_(0, 0);
+    constexpr double kMaxControlPeriodSec = 0.01;
 
     rclcpp::init(argc, argv);
     auto nh = rclcpp::Node::make_shared("cheat_controller_node");
 
     //create a subscriber to pauseFlag
     auto pause_sub = nh->create_subscription<std_msgs::msg::Bool>("pauseFlag", 1, pauseCallback);
+    auto controller_ready_pub = nh->create_publisher<std_msgs::msg::Bool>("controllerReady", 1);
+    std_msgs::msg::Bool controller_ready_msg;
+    controller_ready_msg.data = false;
+    controller_ready_pub->publish(controller_ready_msg);
     humanoid_controller::humanoidCheaterController controller;
     if (!controller.init(nh)) {
         RCLCPP_ERROR(nh->get_logger(), "Failed to initialize the humanoid controller!");
         return -1;
     }
 
-    auto startTime = Clock::now();
-    auto startTimeROS = nh->now();
-    controller.starting(startTimeROS);
-    auto lastTime = startTime;
-
-    //create a thread to spin the node
+    // Start spinning before controller.starting() so subscriptions are serviced
     std::thread spin_thread([&](){
         rclcpp::spin(nh);
     });
-    spin_thread.detach();
+
+    auto startTimeROS = nh->now();
+    try {
+        controller.starting(startTimeROS);
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(nh->get_logger(), "Controller starting exception: %s", e.what());
+        rclcpp::shutdown();
+        if (spin_thread.joinable()) {
+            spin_thread.join();
+        }
+        return -1;
+    }
+    controller_ready_msg.data = true;
+    controller_ready_pub->publish(controller_ready_msg);
+    auto lastTime = Clock::now();
 
     while(rclcpp::ok()){
-        if (!pause_flag)
+        if (!pause_flag.load(std::memory_order_relaxed))
         {
             const auto currentTime = Clock::now();
             // Compute desired duration rounded to clock decimation
@@ -49,7 +64,8 @@ int main(int argc, char** argv){
 
             // Get change in time
             Duration time_span = std::chrono::duration_cast<Duration>(currentTime - lastTime);
-            elapsedTime_ = rclcpp::Duration::from_seconds(time_span.count());
+            const double clampedPeriod = std::min(time_span.count(), kMaxControlPeriodSec);
+            elapsedTime_ = rclcpp::Duration::from_seconds(clampedPeriod);
             lastTime = currentTime;
 
             // Check cycle time for excess delay
@@ -62,7 +78,11 @@ int main(int argc, char** argv){
 
             // Control
             // let the controller compute the new command (via the controller manager)
-            controller.update(nh->now(), elapsedTime_);
+            try {
+                controller.update(nh->now(), elapsedTime_);
+            } catch (const std::exception& e) {
+                RCLCPP_ERROR(nh->get_logger(), "Controller update exception: %s", e.what());
+            }
 
             // Sleep
             const auto sleepTill = currentTime + std::chrono::duration_cast<Clock::duration>(desiredDuration);
@@ -71,6 +91,10 @@ int main(int argc, char** argv){
     }
 
 
+
+    if (spin_thread.joinable()) {
+        spin_thread.join();
+    }
 
     return 0;
 }
