@@ -54,7 +54,7 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo --symlink-install #i
 source install/setup.bash
 
 # To start simulation with the cheat state estimator.
-# After startup, explicitly unpause with /pauseFlag=false, then select a gait and send /cmd_vel.
+# After startup, MuJoCo auto-releases the initial pause, and the gait command opens in a separate terminal.
 ros2 launch humanoid_controllers load_cheat_controller.launch.py
 
 # To start simulation with the normal state estimator.
@@ -77,15 +77,9 @@ Recommended startup sequence:
    ros2 launch humanoid_controllers load_cheat_controller.launch.py
    ```
 
-3. Wait until the controller has finished initializing. The simulator now keeps physics paused until the controller reports ready, and it also applies an extra startup hold.
-4. Explicitly release pause after startup:
-
-   ```bash
-   ros2 topic pub --once /pauseFlag std_msgs/msg/Bool '{data: false}'
-   ```
-
-5. Select a gait with the gait command node.
-6. Send a nonzero `/cmd_vel` command to actually move. A gait switch alone is not sufficient for forward walking.
+3. Wait until the controller has finished initializing. The simulator now keeps physics paused until the controller reports ready, applies an extra startup hold, and then automatically releases the startup pause.
+4. A separate terminal is opened for the gait command node, so you can change gait interactively there.
+5. Send a nonzero `/cmd_vel` command to actually move. A gait switch alone is not sufficient for forward walking.
 
 Example walking trigger:
 
@@ -95,7 +89,7 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.2, y: 0.0
 
 Notes:
 
-- Explicit `/pauseFlag=false` is still the recommended operating procedure even though the simulator now supports queued unpause requests.
+- Explicit `/pauseFlag=false` is no longer required for normal startup. It is still available if you want to control pause state manually.
 - At startup, the controller holds a nominal stand posture while the planned mode remains `STANCE`.
 - The stand hold is released automatically when a non-`STANCE` gait is requested.
 - The idle teleop node no longer continuously overwrites `/cmd_vel` with zeros, so external velocity commands can take effect correctly.

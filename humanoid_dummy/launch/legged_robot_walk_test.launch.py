@@ -1,0 +1,114 @@
+"""
+Walk-test launch using the OCS2 dummy node (perfect state tracking).
+Tests MPC gait planning + target trajectories without Mujoco physics.
+
+Usage:
+  ros2 launch humanoid_dummy legged_robot_walk_test.launch.py
+
+Steps after launch:
+  1. Wait for "Initial policy has been received" in the dummy-node terminal.
+  2. In the gait-command terminal type: walk  (or slow_walk / trot)
+  3. In the teleop terminal press & hold 'w' to walk forward.
+"""
+
+from launch import LaunchDescription
+from launch.actions import (
+    AppendEnvironmentVariable,
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    IncludeLaunchDescription,
+)
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+import os
+
+
+def _ocs2_lib_paths():
+    base = os.path.join(os.path.expanduser('~'), 'ocs2_ws/install')
+    return ':'.join([
+        os.path.join(base, 'hpipm_catkin/lib'),
+        os.path.join(base, 'hpp-fcl/lib'),
+        os.path.join(base, 'ocs2_pinocchio_interface/lib'),
+        os.path.join(base, 'ocs2_core/lib'),
+        os.path.join(base, 'pinocchio/lib'),
+        os.path.join(base, 'blasfeo_catkin/lib'),
+        os.path.join(base, 'ocs2_msgs/lib'),
+        os.path.join(base, 'ocs2_ros_interfaces/lib'),
+    ])
+
+
+def generate_launch_description():
+    common_params = [{
+        'taskFile':        LaunchConfiguration('taskFile'),
+        'referenceFile':   LaunchConfiguration('referenceFile'),
+        'urdfFile':        LaunchConfiguration('urdfFile'),
+        'urdfFileOrigin':  LaunchConfiguration('urdfFileOrigin'),
+        'gaitCommandFile': LaunchConfiguration('gaitCommandFile'),
+    }]
+
+    return LaunchDescription([
+        # ── arguments ──────────────────────────────────────────────
+        DeclareLaunchArgument('taskFile',        default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/mpc/task.info'])),
+        DeclareLaunchArgument('referenceFile',   default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/reference.info'])),
+        DeclareLaunchArgument('urdfFile',        default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_control.urdf'])),
+        DeclareLaunchArgument('urdfFileOrigin',  default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_origin.urdf'])),
+        DeclareLaunchArgument('gaitCommandFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/gait.info'])),
+
+        # ── OCS2 shared-library paths ─────────────────────────────
+        AppendEnvironmentVariable('LD_LIBRARY_PATH', _ocs2_lib_paths()),
+
+        # ── RViz visualisation ────────────────────────────────────
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'launch', 'display.launch.py'])
+            )
+        ),
+
+        # ── SQP-MPC solver ────────────────────────────────────────
+        Node(
+            package='humanoid_dummy',
+            executable='humanoid_sqp_mpc',
+            name='humanoid_sqp_mpc',
+            output='screen',
+            parameters=common_params,
+        ),
+
+        # ── Dummy node (perfect state tracker) ────────────────────
+        Node(
+            package='humanoid_dummy',
+            executable='humanoid_dummy_node',
+            name='humanoid_dummy_node',
+            output='screen',
+            prefix='gnome-terminal --title="Dummy Node" -- ',
+            parameters=common_params,
+        ),
+
+        # ── Target trajectories publisher (cmd_vel → MPC targets) ─
+        Node(
+            package='humanoid_controllers',
+            executable='humanoid_target_trajectories_publisher',
+            name='humanoid_target',
+            output='screen',
+            parameters=common_params,
+        ),
+
+        # ── Teleop (keyboard → /cmd_vel) ─────────────────────────
+        Node(
+            package='mujoco_sim',
+            executable='teleop.py',
+            name='teleop',
+            output='screen',
+        ),
+
+        # ── Gait-command terminal ─────────────────────────────────
+        Node(
+            package='humanoid_dummy',
+            executable='humanoid_gait_command',
+            name='humanoid_gait_command',
+            output='screen',
+            prefix='gnome-terminal --title="Gait Command" -- ',
+            parameters=common_params,
+        ),
+    ])

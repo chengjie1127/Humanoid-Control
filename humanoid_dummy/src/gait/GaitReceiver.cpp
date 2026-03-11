@@ -50,10 +50,14 @@ void GaitReceiver::preSolverRun(scalar_t initTime, scalar_t finalTime, const vec
                                 const ReferenceManagerInterface& referenceManager) {
   if (gaitUpdated_) {
     std::lock_guard<std::mutex> lock(receivedGaitMutex_);
-    std::cerr << "[GaitReceiver]: Setting new gait after time " << finalTime << "\n";
+    // Insert the new gait near the START of the horizon so it takes effect
+    // quickly (~0.3s) instead of at the horizon end (~1.6s delay).
+    const scalar_t insertionDelay = 0.2;  // small delay for smooth transition
+    const scalar_t insertionTime = initTime + insertionDelay;
+    std::cerr << "[GaitReceiver]: Setting new gait at time " << insertionTime
+              << " (horizon [" << initTime << ", " << finalTime << "])\n";
     std::cerr << receivedGait_;
-    const auto timeHorizon = finalTime - initTime;
-    gaitSchedulePtr_->insertModeSequenceTemplate(receivedGait_, finalTime, timeHorizon);
+    gaitSchedulePtr_->insertModeSequenceTemplate(receivedGait_, insertionTime, finalTime);
     gaitUpdated_ = false;
   }
 }

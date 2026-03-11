@@ -254,7 +254,10 @@ Task WbcBase::formulateBaseAngularMotionTask()
   // desired acc
   vector3_t accDesired = baseAccelerationDes_.tail<3>();
 
-  b = accDesired + baseAngularKp_ * error + baseAngularKd_ * (vDesiredGlobal - vMeasuredGlobal) -
+  const scalar_t baseAngularKp = isSingleSupportMode() ? singleSupportBaseAngularKp_ : baseAngularKp_;
+  const scalar_t baseAngularKd = isSingleSupportMode() ? singleSupportBaseAngularKd_ : baseAngularKd_;
+
+  b = accDesired + baseAngularKp * error + baseAngularKd * (vDesiredGlobal - vMeasuredGlobal) -
       base_dj_.block(3, 0, 3, info_.generalizedCoordinatesNum) * vMeasured_;
 
   return { a, b, matrix_t(), vector_t() };
@@ -362,6 +365,9 @@ void WbcBase::loadTasksSetting(const std::string& taskFile, bool verbose)
   }
   loadData::loadPtreeValue(pt, baseAngularKp_, prefix + "kp", verbose);
   loadData::loadPtreeValue(pt, baseAngularKd_, prefix + "kd", verbose);
+
+  singleSupportBaseAngularKp_ = pt.get<scalar_t>("singleSupportBaseAngularTask.kp", baseAngularKp_);
+  singleSupportBaseAngularKd_ = pt.get<scalar_t>("singleSupportBaseAngularTask.kd", baseAngularKd_);
 }
 
 }  // namespace humanoid

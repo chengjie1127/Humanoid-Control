@@ -1,9 +1,11 @@
 list
 {
   [0] stance
-  [1] trot
+  [1] pace
   [2] walk
-  [3] quick_trot
+  [3] slow_walk
+  [4] trot
+  [5] quick_trot
 }
 
 stance
@@ -19,6 +21,65 @@ stance
    }
 }
 
+pace
+ {
+   modeSequence
+   {
+     [0]     STANCE
+     [1]     LCONTACT
+     [2]     STANCE
+     [3]     RCONTACT
+   }
+   switchingTimes
+   {
+     [0]     0.0
+     [1]     0.30
+     [2]     0.55
+     [3]     0.85
+     [4]     1.10
+   }
+}
+
+walk
+ {
+   modeSequence
+   {
+     [0]     STANCE
+     [1]     LCONTACT
+     [2]     STANCE
+     [3]     RCONTACT
+   }
+   switchingTimes
+   {
+     [0]     0.0
+     [1]     0.12
+     [2]     0.52
+     [3]     0.64
+     [4]     1.04
+   }
+}
+
+slow_walk
+ {
+   modeSequence
+   {
+     [0]     STANCE
+     [1]     LCONTACT
+     [2]     STANCE
+     [3]     RCONTACT
+     [4]     STANCE
+   }
+   switchingTimes
+   {
+     [0]     0.0
+     [1]     0.2
+     [2]     0.65
+     [3]     0.85
+     [4]     1.3
+     [5]     1.5
+   }
+}
+
 trot
  {
    modeSequence
@@ -31,25 +92,6 @@ trot
      [0]     0.0
      [1]     0.45
      [2]     0.9
-   }
-}
-
-walk
- {
-   modeSequence
-   {
-     [0]     LCONTACT
-     [1]     STANCE
-     [2]     RCONTACT
-     [3]     STANCE
-   }
-   switchingTimes
-   {
-     [0]     0.0
-     [1]     0.45
-     [2]     0.6
-     [3]     1.05
-     [4]     1.2
    }
 }
 

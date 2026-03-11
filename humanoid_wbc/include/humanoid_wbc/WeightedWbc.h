@@ -31,6 +31,7 @@ protected:
 
 private:
   scalar_t weightSwingLeg_, weightBaseAccel_, weightContactForce_;
+  scalar_t singleSupportWeightSwingLeg_, singleSupportWeightBaseAccel_, singleSupportWeightContactForce_;
 
   vector_t last_qpSol;
 };

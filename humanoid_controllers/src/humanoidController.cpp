@@ -183,6 +183,41 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     return;
   }
 
+  // MPC warm-up: run full MPC+WBC pipeline but gradually ramp up WBC torque feedforward.
+  // This lets the MPC converge on real sensor data while smoothly transitioning from PD-only to full WBC control.
+  if (mpcWarmupActive_) {
+    mpcWarmupIterations_++;
+    try {
+      updateStateEstimation(time, period);
+      mpcMrtInterface_->setCurrentObservation(currentObservation_);
+      mpcMrtInterface_->updatePolicy();
+
+      vector_t optimizedState, optimizedInput;
+      mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
+      currentObservation_.input = optimizedInput;
+
+      vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
+      const vector_t& torque = x.tail(jointNum_);
+
+      // Ramp torque blend from 0 to 1 over the warm-up period
+      scalar_t blend = std::clamp(static_cast<scalar_t>(mpcWarmupIterations_) / static_cast<scalar_t>(kMpcWarmupMinIterations), 0.0, 1.0);
+      vector_t blendedTorque = blend * torque;
+      publishStandCommand(blendedTorque);
+      publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
+    } catch (const std::exception& e) {
+      RCLCPP_WARN_STREAM(controllerNh_->get_logger(), "[humanoid Controller] MPC warmup exception: " << e.what());
+      publishDiagnosticStatus(true);
+      publishStandCommand();
+    }
+
+    if (mpcWarmupIterations_ >= kMpcWarmupMinIterations) {
+      mpcWarmupActive_ = false;
+      RCLCPP_INFO_STREAM(controllerNh_->get_logger(), 
+          "MPC warm-up complete after " << mpcWarmupIterations_ << " iterations.");
+    }
+    return;
+  }
+
   try {
     // State Estimate
     updateStateEstimation(time, period);
@@ -218,6 +253,8 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     velDes = velDes + wbc_planned_joint_acc * dt;
 
     if (initialStanceHoldActive_ && plannedMode_ != ModeNumber::STANCE) {
+      RCLCPP_INFO_STREAM(controllerNh_->get_logger(),
+          "Initial stance hold released (mode=" << plannedMode_ << ")");
       initialStanceHoldActive_ = false;
       controlBlendStartInitialized_ = true;
       controlBlendElapsedTime_ = 0.0;
@@ -234,7 +271,7 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
 
     if (initialStanceHoldActive_ && plannedMode_ == ModeNumber::STANCE) {
       publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
-      publishStandCommand();
+      publishStandCommand(torque);
 
       robotVisualizer_->update(currentObservation_, mpcMrtInterface_->getPolicy(), mpcMrtInterface_->getCommand());
       observationPublisher_->publish(ros_msg_conversions::createObservationMsg(currentObservation_));
@@ -328,6 +365,34 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
 void humanoidController::publishStandCommand() {
   std_msgs::msg::Float32MultiArray targetTorqueMsg;
   targetTorqueMsg.data.assign(jointNum_, 0.0F);
+
+  std_msgs::msg::Float32MultiArray targetPosMsg;
+  targetPosMsg.data.reserve(jointNum_);
+  for (size_t i = 0; i < jointNum_; ++i) {
+    targetPosMsg.data.push_back(static_cast<float>(defalutJointPos_(i)));
+  }
+
+  std_msgs::msg::Float32MultiArray targetVelMsg;
+  targetVelMsg.data.assign(jointNum_, 0.0F);
+
+  std_msgs::msg::Float32MultiArray targetKpMsg;
+  targetKpMsg.data.assign(kStandKp.begin(), kStandKp.end());
+  std_msgs::msg::Float32MultiArray targetKdMsg;
+  targetKdMsg.data.assign(kStandKd.begin(), kStandKd.end());
+
+  targetTorquePub_->publish(targetTorqueMsg);
+  targetPosPub_->publish(targetPosMsg);
+  targetVelPub_->publish(targetVelMsg);
+  targetKpPub_->publish(targetKpMsg);
+  targetKdPub_->publish(targetKdMsg);
+}
+
+void humanoidController::publishStandCommand(const vector_t& torqueFeedforward) {
+  std_msgs::msg::Float32MultiArray targetTorqueMsg;
+  targetTorqueMsg.data.reserve(jointNum_);
+  for (size_t i = 0; i < jointNum_; ++i) {
+    targetTorqueMsg.data.push_back(static_cast<float>(torqueFeedforward(i)));
+  }
 
   std_msgs::msg::Float32MultiArray targetPosMsg;
   targetPosMsg.data.reserve(jointNum_);

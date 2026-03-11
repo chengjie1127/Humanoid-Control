@@ -19,6 +19,7 @@ scalar_t TARGET_ROTATION_VELOCITY;
 scalar_t COM_HEIGHT;
 vector_t DEFAULT_JOINT_STATE(12);
 scalar_t TIME_TO_TARGET;
+constexpr scalar_t CMD_VEL_TIME_TO_TARGET_LIMIT = 0.6;
 }  // namespace
 
 scalar_t estimateTimeToTarget(const vector_t& desiredBaseDisplacement) {
@@ -71,7 +72,7 @@ TargetTrajectories cmdVelToTargetTrajectories(const vector_t& cmdVel, const Syst
   const Eigen::Matrix<scalar_t, 3, 1> zyx = currentPose.tail(3);
   vector_t cmdVelRot = getRotationMatrixFromZyxEulerAngles(zyx) * cmdVel.head(3);
 
-  const scalar_t timeToTarget = TIME_TO_TARGET;
+  const scalar_t timeToTarget = std::min(TIME_TO_TARGET, CMD_VEL_TIME_TO_TARGET_LIMIT);
     
   const vector_t targetPose = [&]() {
     vector_t target(6);

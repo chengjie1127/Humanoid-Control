@@ -75,6 +75,11 @@ public:
   }
 
 protected:
+  bool isSingleSupportMode() const
+  {
+    return numContacts_ < info_.numThreeDofContacts;
+  }
+
   void updateMeasured(const vector_t& rbdStateMeasured);
   void updateDesired(const vector_t& stateDesired, const vector_t& inputDesired);
 
@@ -112,6 +117,7 @@ protected:
   scalar_t frictionCoeff_{}, swingKp_{}, swingKd_{};
   scalar_t baseHeightKp_{}, baseHeightKd_{};
   scalar_t baseAngularKp_{}, baseAngularKd_{};
+  scalar_t singleSupportBaseAngularKp_{}, singleSupportBaseAngularKd_{};
 
   vector_t cmd_body_pos_;
   vector_t cmd_body_vel_;

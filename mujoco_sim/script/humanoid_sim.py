@@ -222,6 +222,7 @@ class HumanoidSim(MuJoCoBase):
     
     while not glfw.window_should_close(self.window):
       self.release_pending_unpause_if_ready()
+      self.release_startup_pause_if_ready()
       simstart = self.data.time
       simulation_active = (not self.pause_flag) and self.can_run_simulation()
 
@@ -383,6 +384,7 @@ def main(args=None):
     # get xml path
     hector_desc_path = get_package_share_directory('humanoid_legged_description')
     xml_path = hector_desc_path + "/mjcf/humanoid_legged.xml"
+
     sim = HumanoidSim(xml_path, node)
     sim.reset()
     

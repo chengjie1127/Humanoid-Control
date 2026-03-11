@@ -50,6 +50,7 @@ class humanoidController {
   void jointStateCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
   void ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg);
   void publishStandCommand();
+  void publishStandCommand(const vector_t& torqueFeedforward);
   void publishDiagnosticStatus(bool fallbackMode, bool hasTorque = false, scalar_t torque0 = 0.0, scalar_t torque1 = 0.0,
                                scalar_t torque2 = 0.0);
 
@@ -99,6 +100,10 @@ class humanoidController {
   bool initialStanceHoldActive_ = true;
   scalar_t startupCommandBlendDuration_ = 2.0;
   scalar_t controlBlendElapsedTime_ = 0.0;
+  // MPC warm-up: run MPC loop on real sensor data for N seconds before commanding WBC torques
+  bool mpcWarmupActive_ = true;
+  int mpcWarmupIterations_ = 0;
+  static constexpr int kMpcWarmupMinIterations = 500;  // ~1s at 500Hz update rate
   benchmark::RepeatedTimer mpcTimer_;
   benchmark::RepeatedTimer wbcTimer_;
   size_t jointNum_ = 12;

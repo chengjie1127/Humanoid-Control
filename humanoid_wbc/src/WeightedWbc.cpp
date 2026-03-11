@@ -80,9 +80,14 @@ Task WeightedWbc::formulateConstraints()
 
 Task WeightedWbc::formulateWeightedTasks(const vector_t& stateDesired, const vector_t& inputDesired, scalar_t period)
 {
-    return formulateSwingLegTask() * weightSwingLeg_ +
-           formulateBaseAccelTask(stateDesired, inputDesired, period) * weightBaseAccel_ +
-           formulateContactForceTask(inputDesired) * weightContactForce_;
+  const bool singleSupport = isSingleSupportMode();
+  const scalar_t swingLegWeight = singleSupport ? singleSupportWeightSwingLeg_ : weightSwingLeg_;
+  const scalar_t baseAccelWeight = singleSupport ? singleSupportWeightBaseAccel_ : weightBaseAccel_;
+  const scalar_t contactForceWeight = singleSupport ? singleSupportWeightContactForce_ : weightContactForce_;
+
+  return formulateSwingLegTask() * swingLegWeight +
+       formulateBaseAccelTask(stateDesired, inputDesired, period) * baseAccelWeight +
+       formulateContactForceTask(inputDesired) * contactForceWeight;
 }
 
 
@@ -101,6 +106,10 @@ void WeightedWbc::loadTasksSetting(const std::string& taskFile, bool verbose)
   loadData::loadPtreeValue(pt, weightSwingLeg_, prefix + "swingLeg", verbose);
   loadData::loadPtreeValue(pt, weightBaseAccel_, prefix + "baseAccel", verbose);
   loadData::loadPtreeValue(pt, weightContactForce_, prefix + "contactForce", verbose);
+
+  singleSupportWeightSwingLeg_ = pt.get<scalar_t>("singleSupportWeight.swingLeg", weightSwingLeg_);
+  singleSupportWeightBaseAccel_ = pt.get<scalar_t>("singleSupportWeight.baseAccel", weightBaseAccel_);
+  singleSupportWeightContactForce_ = pt.get<scalar_t>("singleSupportWeight.contactForce", weightContactForce_);
 }
 
 }  // namespace humanoid

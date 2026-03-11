@@ -13,15 +13,15 @@ model_settings
   phaseTransitionStanceTime     0.4
 
   verboseCppAd                  false
-  recompileLibrariesCppAd       true
+  recompileLibrariesCppAd       false
   modelFolderCppAd              /tmp/ocs2
 }
 
 swing_trajectory_config
 {
-  liftOffVelocity               0.065
-  touchDownVelocity            -0.065
-  swingHeight                   0.065
+  liftOffVelocity               0.08
+  touchDownVelocity            -0.08
+  swingHeight                   0.08
   swingTimeScale                0.15
 }
 
@@ -251,8 +251,8 @@ frictionConeTask
 
 swingLegTask
 {
-    kp                   200  
-    kd                   12   
+    kp                   250  
+    kd                   20   
 }
 
 baseAngularTask 
@@ -261,11 +261,24 @@ baseAngularTask
   kd                   12
 }
 
+singleSupportBaseAngularTask
+{
+  kp                   80
+  kd                   8
+}
+
 weight
 {
     swingLeg        100
   baseAccel       80
   contactForce    10
+}
+
+singleSupportWeight
+{
+    swingLeg        100
+  baseAccel       40
+  contactForce    5
 }
 
 ; State Estimation

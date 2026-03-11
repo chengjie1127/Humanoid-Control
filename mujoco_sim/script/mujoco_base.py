@@ -19,6 +19,7 @@ class MuJoCoBase():
         self.controller_ready_time = None
         self.ready_hold_duration = 2.0
         self.pending_unpause_request = False
+        self.startup_auto_unpause_pending = True
         self.space_pressed = False
         self.keyboard_enable_time = time.time() + 2.0
         self.pubSimState = self.node.create_publisher(Bool, '/pauseFlag', 10)
@@ -73,8 +74,18 @@ class MuJoCoBase():
     def release_pending_unpause_if_ready(self):
         if self.pending_unpause_request and self.can_run_simulation():
             self.pending_unpause_request = False
+            self.startup_auto_unpause_pending = False
             self.pause_flag = False
             self.node.get_logger().info('Applying queued unpause request.')
+
+    def release_startup_pause_if_ready(self):
+        if self.startup_auto_unpause_pending and not self.pending_unpause_request and self.can_run_simulation():
+            self.startup_auto_unpause_pending = False
+            self.pause_flag = False
+            self.node.get_logger().info('Automatically releasing startup pause.')
+            simState = Bool()
+            simState.data = self.pause_flag
+            self.pubSimState.publish(simState)
 
     def keyboard(self, window, key, scancode, act, mods):
         if act == glfw.PRESS and key == glfw.KEY_BACKSPACE:
@@ -94,6 +105,8 @@ class MuJoCoBase():
             if not self.pause_flag and not self.can_run_simulation():
                 self.pause_flag = True
                 self.node.get_logger().info('Unpause requested before controller startup settled; staying paused.')
+            else:
+                self.startup_auto_unpause_pending = False
             mj.mj_forward(self.model, self.data)
             simState = Bool()
             simState.data = self.pause_flag
