@@ -9,17 +9,18 @@ import threading
 import time
 
 
-FORWARD_SPEED = 0.3
-LATERAL_SPEED = 0.15
-YAW_SPEED = 0.3
+FORWARD_SPEED = 0.2
+LATERAL_SPEED = 0.1
+YAW_SPEED = 0.2
 
 # Gait definitions: switchingTimes + modeSequence
 # STANCE=3, LCONTACT=1, RCONTACT=2
 GAITS = {
-    'stance': ModeSchedule(event_times=[0.0, 1000.0], mode_sequence=[3]),
-    'pace':   ModeSchedule(event_times=[0.0, 0.20, 0.55, 0.75, 1.10], mode_sequence=[3, 1, 3, 2]),
-    'walk':   ModeSchedule(event_times=[0.0, 0.12, 0.52, 0.64, 1.04], mode_sequence=[3, 1, 3, 2]),
-    'trot':   ModeSchedule(event_times=[0.0, 0.45, 0.9], mode_sequence=[1, 2]),
+    'stance':    ModeSchedule(event_times=[0.0, 1000.0], mode_sequence=[3]),
+    'pace':      ModeSchedule(event_times=[0.0, 0.50, 0.60, 1.10, 1.20], mode_sequence=[3, 1, 3, 2]),
+    'slow_walk': ModeSchedule(event_times=[0.0, 0.20, 0.65, 0.85, 1.30, 1.50], mode_sequence=[3, 1, 3, 2, 3]),
+    'walk':      ModeSchedule(event_times=[0.0, 0.12, 0.52, 0.64, 1.04], mode_sequence=[3, 1, 3, 2]),
+    'trot':      ModeSchedule(event_times=[0.0, 0.45, 0.9], mode_sequence=[1, 2]),
 }
 DEFAULT_MOVE_GAIT = 'pace'  # conservative gait for in-place stepping
 

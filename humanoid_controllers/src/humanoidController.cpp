@@ -32,8 +32,12 @@ using namespace ocs2;
 using namespace humanoid;
 
 namespace {
-constexpr std::array<float, 12> kStandKp = {80.0F, 60.0F, 80.0F, 80.0F, 4.0F, 4.0F, 80.0F, 60.0F, 80.0F, 80.0F, 4.0F, 4.0F};
-constexpr std::array<float, 12> kStandKd = {1.2F, 0.9F, 1.2F, 1.2F, 0.1F, 0.1F, 1.2F, 0.9F, 1.2F, 1.2F, 0.1F, 0.1F};
+// Stance PD gains (used during warmup, stance hold, and start of walking blend)
+constexpr std::array<float, 12> kStandKp = {150.0F, 150.0F, 80.0F, 150.0F, 50.0F, 40.0F, 150.0F, 150.0F, 80.0F, 150.0F, 50.0F, 40.0F};
+constexpr std::array<float, 12> kStandKd = {2.0F, 2.0F, 1.2F, 2.0F, 1.0F, 0.8F, 2.0F, 2.0F, 1.2F, 2.0F, 1.0F, 0.8F};
+// Walk PD gains: low to avoid fighting WBC torques during walking
+constexpr std::array<float, 12> kWalkKp = {20.0F, 20.0F, 10.0F, 20.0F, 8.0F, 6.0F, 20.0F, 20.0F, 10.0F, 20.0F, 8.0F, 6.0F};
+constexpr std::array<float, 12> kWalkKd = {8.0F, 8.0F, 4.8F, 8.0F, 4.0F, 3.2F, 8.0F, 8.0F, 4.8F, 8.0F, 4.0F, 3.2F};
 }
 
 bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
@@ -70,7 +74,7 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   //TODO: setup hardware controller interface
   //create a ROS subscriber to receive the joint pos and vel
   jointPos_ = vector_t::Zero(jointNum_);
-  jointPos_ << 0.05, 0.0, 0.37, 0.90, 0.53, 0, -0.05, 0.0, 0.37, 0.90, 0.53, 0;
+  jointPos_ << -0.1, 0.0, 0.0, 0.25, -0.14, 0, -0.1, 0.0, 0.0, 0.25, -0.14, 0;
   jointVel_ = vector_t::Zero(jointNum_);
   quat_ = Eigen::Quaternion<scalar_t>(1, 0, 0, 0);
   angularVel_.setZero();
@@ -145,7 +149,7 @@ void humanoidController::starting(const rclcpp::Time& time) {
 
   // Initial state
   currentObservation_.state = vector_t::Zero(HumanoidInterface_->getCentroidalModelInfo().stateDim);
-  currentObservation_.state(8) = 0.976;
+  currentObservation_.state(8) = 0.75;
   currentObservation_.state.segment(6 + 6, jointNum_) = defalutJointPos_;
 
   updateStateEstimation(time, rclcpp::Duration::from_seconds(0.002));
@@ -252,12 +256,15 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     posDes = posDes + 0.5 * wbc_planned_joint_acc * dt * dt;
     velDes = velDes + wbc_planned_joint_acc * dt;
 
+    // Release stance hold when first non-STANCE mode is planned
     if (initialStanceHoldActive_ && plannedMode_ != ModeNumber::STANCE) {
       RCLCPP_INFO_STREAM(controllerNh_->get_logger(),
           "Initial stance hold released (mode=" << plannedMode_ << ")");
       initialStanceHoldActive_ = false;
-      controlBlendStartInitialized_ = true;
-      controlBlendElapsedTime_ = 0.0;
+      walkingBlendActive_ = true;
+      walkingBlendIterations_ = 0;
+      filteredWalkTorque_ = torque;
+      walkTorqueFilterInitialized_ = true;
     }
 
     // Safety check, if failed, stop the controller
@@ -269,6 +276,7 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
       return;
     }
 
+    // During stance hold: WBC torque + PD to default joint positions (proven stable)
     if (initialStanceHoldActive_ && plannedMode_ == ModeNumber::STANCE) {
       publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
       publishStandCommand(torque);
@@ -280,41 +288,110 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
 
     publishDiagnosticStatus(false, true, torque(0), torque(1), torque(2));
 
-      scalar_t commandBlend = 1.0;
-      if (controlBlendStartInitialized_) {
-        controlBlendElapsedTime_ = std::min(controlBlendElapsedTime_ + period.seconds(), startupCommandBlendDuration_);
-        commandBlend = std::clamp(controlBlendElapsedTime_ / startupCommandBlendDuration_, 0.0, 1.0);
+    // Walking diagnostics: log orientation and torques at 20Hz
+    {
+      const auto wallNow = std::chrono::steady_clock::now();
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(wallNow - lastDiagnosticWallTime_).count() >= 50) {
+        scalar_t actual_pitch = 2.0 * std::asin(quat_.y());
+        scalar_t actual_roll = 2.0 * std::asin(quat_.x());
+        RCLCPP_INFO_STREAM(controllerNh_->get_logger(),
+            "[WalkDiag] mode=" << plannedMode_
+            << " pitch=" << actual_pitch << " roll=" << actual_roll
+            << " t0=" << torque(0) << " t6=" << torque(6));
       }
+    }
 
-        std_msgs::msg::Float32MultiArray targetTorqueMsg;
-      for (int i1 = 0; i1 < 12; ++i1) {
-          targetTorqueMsg.data.push_back(static_cast<float>(commandBlend * torque(i1)));
+    // Walking blend: smooth 500ms transition from stance to walk PD gains.
+    // During swing phases, use full MPC positions to allow foot lift.
+    constexpr int kWalkingBlendDuration = 250;  // 500ms at 500Hz
+    std::array<float, 12> activeKp, activeKd;
+    if (walkingBlendActive_) {
+      walkingBlendIterations_++;
+      float alpha = std::min(1.0f, static_cast<float>(walkingBlendIterations_) / static_cast<float>(kWalkingBlendDuration));
+      // Only blend positions during STANCE — during swing, MPC positions must
+      // pass through fully so the foot can follow the swing trajectory.
+      if (plannedMode_ == ModeNumber::STANCE) {
+        for (int i = 0; i < static_cast<int>(jointNum_); i++) {
+          posDes(i) = (1.0 - alpha) * defalutJointPos_(i) + alpha * posDes(i);
+          velDes(i) = alpha * velDes(i);
+        }
       }
-      //output targetTorqueMsg
-  //    std::cerr << "targetTorqueMsg: " << targetTorqueMsg << std::endl;
+      // Always blend PD gains smoothly
+      for (int i = 0; i < 12; i++) {
+        activeKp[i] = kStandKp[i] * (1.0f - alpha) + kWalkKp[i] * alpha;
+        activeKd[i] = kStandKd[i] * (1.0f - alpha) + kWalkKd[i] * alpha;
+      }
+      if (walkingBlendIterations_ >= kWalkingBlendDuration) {
+        walkingBlendActive_ = false;
+        RCLCPP_INFO(controllerNh_->get_logger(), "Walking blend complete");
+      }
+    } else {
+      activeKp = kWalkKp;
+      activeKd = kWalkKd;
+    }
+
+    // Mode-dependent PD: reduce PD gains for swing legs to avoid fighting WBC
+    // The WBC already computes optimal torques for swing trajectory tracking;
+    // PD overlay causes torque saturation at actuator limits.
+    constexpr float kSwingKp = 0.0f;   // No position PD for swing legs (WBC handles it)
+    constexpr float kSwingKd = 1.5f;   // Small damping only
+    if (plannedMode_ == ModeNumber::LCONTACT) {
+      // Left foot on ground → right leg (joints 6-11) is swinging
+      for (int i = 6; i < 12; i++) {
+        activeKp[i] = kSwingKp;
+        activeKd[i] = kSwingKd;
+      }
+    } else if (plannedMode_ == ModeNumber::RCONTACT) {
+      // Right foot on ground → left leg (joints 0-5) is swinging
+      for (int i = 0; i < 6; i++) {
+        activeKp[i] = kSwingKp;
+        activeKd[i] = kSwingKd;
+      }
+    }
+
+    // (Pitch drift compensation removed — constant offsets fight the MPC)
+
+    // EMA filter to smooth WBC torque chattering from high-authority QP
+    constexpr float kTorqueFilterAlpha = 0.3f;
+    vector_t walkTorque = torque;
+    if (walkTorqueFilterInitialized_) {
+      for (int i = 0; i < static_cast<int>(jointNum_); i++) {
+        filteredWalkTorque_(i) = kTorqueFilterAlpha * torque(i) + (1.0f - kTorqueFilterAlpha) * filteredWalkTorque_(i);
+      }
+      walkTorque = filteredWalkTorque_;
+    } else {
+      filteredWalkTorque_ = torque;
+      walkTorqueFilterInitialized_ = true;
+    }
+
+    // (Pitch feedforward torque removed — constant offsets fight the MPC)
+
+    // Publish WBC torque + blended PD gains
+    {
+      std_msgs::msg::Float32MultiArray targetTorqueMsg;
+      for (int i1 = 0; i1 < 12; ++i1) {
+          targetTorqueMsg.data.push_back(static_cast<float>(walkTorque(i1)));
+      }
       std_msgs::msg::Float32MultiArray targetPosMsg;
       for (int i1 = 0; i1 < 12; ++i1) {
-          const scalar_t blendedPos = (1.0 - commandBlend) * defalutJointPos_(i1) + commandBlend * posDes(i1);
-          targetPosMsg.data.push_back(static_cast<float>(blendedPos));
+          targetPosMsg.data.push_back(static_cast<float>(posDes(i1)));
       }
       std_msgs::msg::Float32MultiArray targetVelMsg;
       for (int i1 = 0; i1 < 12; ++i1) {
-          targetVelMsg.data.push_back(static_cast<float>(commandBlend * velDes(i1)));
+          targetVelMsg.data.push_back(static_cast<float>(velDes(i1)));
       }
       targetTorquePub_->publish(targetTorqueMsg);
       targetPosPub_->publish(targetPosMsg);
       targetVelPub_->publish(targetVelMsg);
       std_msgs::msg::Float32MultiArray targetKp;
       std_msgs::msg::Float32MultiArray targetKd;
-
-      targetKp.data.assign(kStandKp.begin(), kStandKp.end());
-      targetKd.data.assign(kStandKd.begin(), kStandKd.end());
-
-    
+      targetKp.data.assign(activeKp.begin(), activeKp.end());
+      targetKd.data.assign(activeKd.begin(), activeKd.end());
       targetKpPub_->publish(targetKp);
       targetKdPub_->publish(targetKd);
+    }
 
-      // Visualization
+    // Visualization
     robotVisualizer_->update(currentObservation_, mpcMrtInterface_->getPolicy(), mpcMrtInterface_->getCommand());
 
     // Publish the observation. Only needed for the command interface

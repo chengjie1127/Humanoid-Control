@@ -43,12 +43,12 @@ def quat_wxyz_to_euler_xyz(quat_wxyz):
   yaw = np.arctan2(siny_cosp, cosy_cosp)
   return np.array([roll, pitch, yaw])
 
-init_joint_pos = np.array([0.05, 0.0, 0.37, 0.90, 0.53, 0, -0.05, 0.0, 0.37, 0.90, 0.53, 0])
-init_base_pos = np.array([0, 0, 1.225])
+init_joint_pos = np.array([-0.1, 0.0, 0.0, 0.25, -0.14, 0, -0.1, 0.0, 0.0, 0.25, -0.14, 0])
+init_base_pos = np.array([0, 0, 0.793])
 init_base_eular_zyx = np.array([0.0, -0., 0.0])
 imu_eular_bias = np.array([0.0, 0.0, 0.0])
-default_stand_kp = np.array([80.0, 60.0, 80.0, 80.0, 4.0, 4.0, 80.0, 60.0, 80.0, 80.0, 4.0, 4.0])
-default_stand_kd = np.array([1.2, 0.9, 1.2, 1.2, 0.1, 0.1, 1.2, 0.9, 1.2, 1.2, 0.1, 0.1])
+default_stand_kp = np.array([150.0, 150.0, 80.0, 150.0, 50.0, 40.0, 150.0, 150.0, 80.0, 150.0, 50.0, 40.0])
+default_stand_kd = np.array([2.0, 2.0, 1.2, 2.0, 1.0, 0.8, 2.0, 2.0, 1.2, 2.0, 1.0, 0.8])
 
 class HumanoidSim(MuJoCoBase):
   def __init__(self, xml_path, node):
@@ -151,7 +151,7 @@ class HumanoidSim(MuJoCoBase):
     return lowest_point_z
 
   def _support_geom_bottoms(self):
-    support_body_names = {"leg_l6_link", "leg_r6_link"}
+    support_body_names = {"left_ankle_roll_link", "right_ankle_roll_link"}
     support_bottoms = []
     for geom_index in range(self.model.ngeom):
       if self.model.geom_contype[geom_index] == 0 and self.model.geom_conaffinity[geom_index] == 0:

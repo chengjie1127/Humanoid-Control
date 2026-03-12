@@ -64,7 +64,10 @@ void SwitchedModelReferenceManager::modifyReferences(scalar_t initTime, scalar_t
   const auto timeHorizon = finalTime - initTime;
   modeSchedule = gaitSchedulePtr_->getModeSchedule(initTime - timeHorizon, finalTime + timeHorizon);
 
-  const scalar_t terrainHeight = 0.0;
+  // terrainHeight = foot contact frame height above ground in stance.
+  // The URDF contact frames (l_foot_toe etc.) are at the MuJoCo sphere center,
+  // which sits sphere_radius (0.02m) above the ground plane.
+  const scalar_t terrainHeight = 0.02;
   swingTrajectoryPtr_->update(modeSchedule, terrainHeight);
 }
 

@@ -98,12 +98,18 @@ class humanoidController {
   std::chrono::steady_clock::time_point lastDiagnosticWallTime_{};
   bool controlBlendStartInitialized_ = false;
   bool initialStanceHoldActive_ = true;
-  scalar_t startupCommandBlendDuration_ = 2.0;
+  scalar_t startupCommandBlendDuration_ = 3.0;
   scalar_t controlBlendElapsedTime_ = 0.0;
+  // Walking PD blend: (disabled — using fixed PD gains like ROS1)
+  bool walkingBlendActive_ = false;
+  int walkingBlendIterations_ = 0;
+  // Walk torque filter: (disabled — direct WBC pass-through like ROS1)
+  bool walkTorqueFilterInitialized_ = false;
+  vector_t filteredWalkTorque_;
   // MPC warm-up: run MPC loop on real sensor data for N seconds before commanding WBC torques
   bool mpcWarmupActive_ = true;
   int mpcWarmupIterations_ = 0;
-  static constexpr int kMpcWarmupMinIterations = 500;  // ~1s at 500Hz update rate
+  static constexpr int kMpcWarmupMinIterations = 1500;  // ~3s at 500Hz update rate
   benchmark::RepeatedTimer mpcTimer_;
   benchmark::RepeatedTimer wbcTimer_;
   size_t jointNum_ = 12;

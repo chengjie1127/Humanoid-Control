@@ -1,22 +1,22 @@
 targetDisplacementVelocity          0.5;
 targetRotationVelocity              0.3;
 
-comHeight                           1.2
+comHeight                           0.75
 
 defaultJointState
 {
-   (0,0)   0.05   ; leg_l1_joint
-   (1,0)   0.0   ; leg_l2_joint
-  (2,0)   0.37   ; leg_l3_joint
-  (3,0)  0.90   ; leg_l4_joint
-  (4,0)   0.53   ; leg_l5_joint
-   (5,0)   0.00   ; leg_l6_joint
-   (6,0)   -0.05   ; leg_r1_joint
-   (7,0)   0.0   ; leg_r2_joint
-  (8,0)   0.37   ; leg_r3_joint
-  (9,0)  0.90   ; leg_r4_joint
-  (10,0)  0.53   ; leg_r5_joint
-   (11,0)  0.00   ; leg_r6_joint
+   (0,0)   -0.1   ; left_hip_pitch_joint
+   (1,0)   0.0   ; left_hip_roll_joint
+  (2,0)   0.0   ; left_hip_yaw_joint
+  (3,0)  0.25   ; left_knee_joint
+  (4,0)   -0.14   ; left_ankle_pitch_joint
+   (5,0)   0.00   ; left_ankle_roll_joint
+   (6,0)   -0.1   ; right_hip_pitch_joint
+   (7,0)   0.0   ; right_hip_roll_joint
+  (8,0)   0.0   ; right_hip_yaw_joint
+  (9,0)  0.25   ; right_knee_joint
+  (10,0)  -0.14   ; right_ankle_pitch_joint
+   (11,0)  0.00   ; right_ankle_roll_joint
 }
 
 initialModeSchedule
