@@ -146,26 +146,26 @@ Q
   (2,2)   13.0     ; vcom_z
   (3,3)   20.0      ; L_x / robotMass
   (4,4)   50.0     ; L_y / robotMass
-  (5,5)   50.0    ; L_z / robotMass
+  (5,5)   150.0   ; L_z / robotMass
 
   ;; Base Pose: [position, orientation] ;;
   (6,6)   500.0    ; p_base_x
   (7,7)   500.0    ; p_base_y
   (8,8)   2000.0    ; p_base_z
-  (9,9)   3000.0   ; theta_base_z
+  (9,9)   5000.0   ; theta_base_z
   (10,10) 2500.0    ; theta_base_y
   (11,11) 2000.0    ; theta_base_x
 
   ;; Leg Joint Positions: [LF, LH, RF, RH] ;;
   (12,12) 250.0     ; left_hip_pitch_joint
   (13,13) 300.0     ; left_hip_roll_joint
-  (14,14) 200.0     ; left_hip_yaw_joint
+  (14,14) 350.0     ; left_hip_yaw_joint
   (15,15) 150.0     ; left_knee_joint
   (16,16) 100.0     ; left_ankle_pitch_joint
   (17,17) 100.0     ; left_ankle_roll_joint
   (18,18) 250.0     ; right_hip_pitch_joint
   (19,19) 300.0     ; right_hip_roll_joint
-  (20,20) 200.0     ; right_hip_yaw_joint
+  (20,20) 350.0     ; right_hip_yaw_joint
   (21,21) 150.0     ; right_knee_joint
   (22,22) 100.0     ; right_ankle_pitch_joint
   (23,23) 100.0     ; right_ankle_roll_joint
@@ -266,6 +266,19 @@ weight
     swingLeg        100
   baseAccel       150
   contactForce    8
+}
+
+singleSupportWeight
+{
+    swingLeg        150
+    baseAccel       250
+    contactForce    5
+}
+
+singleSupportBaseAngularTask
+{
+    kp              250
+    kd              35
 }
 
 ; State Estimation

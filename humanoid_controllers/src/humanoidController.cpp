@@ -37,7 +37,7 @@ constexpr std::array<float, 12> kStandKp = {150.0F, 150.0F, 80.0F, 150.0F, 50.0F
 constexpr std::array<float, 12> kStandKd = {2.0F, 2.0F, 1.2F, 2.0F, 1.0F, 0.8F, 2.0F, 2.0F, 1.2F, 2.0F, 1.0F, 0.8F};
 // Walk PD gains: low to avoid fighting WBC torques during walking
 constexpr std::array<float, 12> kWalkKp = {20.0F, 20.0F, 10.0F, 20.0F, 8.0F, 6.0F, 20.0F, 20.0F, 10.0F, 20.0F, 8.0F, 6.0F};
-constexpr std::array<float, 12> kWalkKd = {8.0F, 8.0F, 4.8F, 8.0F, 4.0F, 3.2F, 8.0F, 8.0F, 4.8F, 8.0F, 4.0F, 3.2F};
+constexpr std::array<float, 12> kWalkKd = {8.0F, 8.0F, 8.0F, 8.0F, 4.0F, 3.2F, 8.0F, 8.0F, 8.0F, 8.0F, 4.0F, 3.2F};
 }
 
 bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
@@ -302,20 +302,31 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     }
 
     // Walking blend: smooth 500ms transition from stance to walk PD gains.
-    // During swing phases, use full MPC positions to allow foot lift.
+    // During the blend, stance-leg joints are smoothly blended from default
+    // positions to MPC-desired positions. Swing-leg joints always get full MPC
+    // positions so the foot can follow the swing trajectory.
     constexpr int kWalkingBlendDuration = 250;  // 500ms at 500Hz
     std::array<float, 12> activeKp, activeKd;
     if (walkingBlendActive_) {
       walkingBlendIterations_++;
       float alpha = std::min(1.0f, static_cast<float>(walkingBlendIterations_) / static_cast<float>(kWalkingBlendDuration));
-      // Only blend positions during STANCE — during swing, MPC positions must
-      // pass through fully so the foot can follow the swing trajectory.
-      if (plannedMode_ == ModeNumber::STANCE) {
-        for (int i = 0; i < static_cast<int>(jointNum_); i++) {
+
+      // Determine which joints are on the stance leg vs swing leg
+      // Joints 0-5 = left leg, joints 6-11 = right leg
+      bool leftIsSwinging = (plannedMode_ == ModeNumber::RCONTACT);  // right foot on ground => left swings
+      bool rightIsSwinging = (plannedMode_ == ModeNumber::LCONTACT); // left foot on ground => right swings
+
+      // Blend stance-leg positions; pass through swing-leg positions fully
+      for (int i = 0; i < static_cast<int>(jointNum_); i++) {
+        bool isSwingJoint = (i < 6 && leftIsSwinging) || (i >= 6 && rightIsSwinging);
+        if (!isSwingJoint) {
+          // Stance leg (or double-support): blend from default to MPC
           posDes(i) = (1.0 - alpha) * defalutJointPos_(i) + alpha * posDes(i);
           velDes(i) = alpha * velDes(i);
         }
+        // Swing leg: keep full MPC posDes/velDes for trajectory tracking
       }
+
       // Always blend PD gains smoothly
       for (int i = 0; i < 12; i++) {
         activeKp[i] = kStandKp[i] * (1.0f - alpha) + kWalkKp[i] * alpha;

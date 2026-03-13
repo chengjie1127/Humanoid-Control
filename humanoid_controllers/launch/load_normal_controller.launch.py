@@ -59,8 +59,15 @@ def create_gait_terminal_action():
         'XDG_RUNTIME_DIR': os.environ.get('XDG_RUNTIME_DIR', ''),
         'XDG_CURRENT_DESKTOP': os.environ.get('XDG_CURRENT_DESKTOP', ''),
         'XDG_SESSION_TYPE': os.environ.get('XDG_SESSION_TYPE', ''),
+        'FASTDDS_BUILTIN_TRANSPORTS': 'UDPv4',
     }
     env_args = [f'{key}={value}' for key, value in sanitized_env.items() if value != '']
+
+    setup_commands = []
+    if ocs2_setup_path:
+        setup_commands.append(f'source "{ocs2_setup_path}"')
+    setup_commands.append(f'source "{setup_path}"')
+
     return ExecuteProcess(
         cmd=[
             '/usr/bin/env',
@@ -72,12 +79,15 @@ def create_gait_terminal_action():
             '/bin/bash',
             '-lc',
             [
-                'source ', ocs2_setup_path, ' && ' if ocs2_setup_path else '',
-                'source ', setup_path,
-                ' && exec ros2 run humanoid_dummy humanoid_gait_command --ros-args',
+                'printf "Humanoid gait command terminal ready.\\n"; ',
+                'printf "Type list to show gaits. Walking also needs nonzero /cmd_vel.\\n\\n"; ',
+                ' && '.join(setup_commands),
+                ' && stdbuf -oL -eL ros2 run humanoid_dummy humanoid_gait_command --ros-args',
                 ' -r __node:=humanoid_gait_command',
                 ' -p gaitCommandFile:=', LaunchConfiguration('gaitCommandFile'),
-                '; exec bash',
+                '; status=$?; '
+                'printf "\\nHumanoid gait command exited with status %s.\\n" "$status"; '
+                'exec bash',
             ],
         ],
         output='screen',
@@ -116,6 +126,7 @@ def generate_launch_description():
             executable='humanoid_target_trajectories_publisher',
             name='humanoid_target',
             output='screen',
+            additional_env={'FASTDDS_BUILTIN_TRANSPORTS': 'UDPv4'},
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
@@ -129,6 +140,7 @@ def generate_launch_description():
             executable='normal_controller_node',
             name='normal_controller',
             output='screen',
+            additional_env={'FASTDDS_BUILTIN_TRANSPORTS': 'UDPv4'},
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
