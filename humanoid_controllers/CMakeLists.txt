@@ -34,8 +34,7 @@ find_package(Boost REQUIRED COMPONENTS
   log_setup
 )
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(pinocchio REQUIRED pinocchio)
+find_package(pinocchio REQUIRED)
 
 include_directories(
   include

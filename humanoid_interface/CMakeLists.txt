@@ -32,8 +32,7 @@ find_package(Boost REQUIRED COMPONENTS
 
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(pinocchio REQUIRED pinocchio)
+find_package(pinocchio REQUIRED)
 
 # Resolve for the package path at compile time.
 configure_file (
@@ -89,11 +88,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   ${pinocchio_LIBRARIES}
   dl
 )
-foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
-  if (NOT ${dep} MATCHES "ocs2_robotic_assets")
-    target_link_libraries(${PROJECT_NAME} PUBLIC ${dep}::${dep})
-  endif()
-endforeach()
+ament_target_dependencies(${PROJECT_NAME} PUBLIC ${AMENT_PACKAGE_DEPENDENCIES})
 
 target_compile_options(${PROJECT_NAME} PUBLIC ${FLAGS})
 
