@@ -32,8 +32,50 @@ find_package(Boost REQUIRED COMPONENTS
 
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(pinocchio REQUIRED pinocchio)
+# Pinocchio (CMake config): provides imported targets like pinocchio::pinocchio.
+find_package(pinocchio REQUIRED CONFIG)
+
+# Some upstream exports (notably from older/locally-built stacks) may list plain
+# "pinocchio" / "hpp-fcl" in INTERFACE_LINK_LIBRARIES. Provide shim targets so
+# those resolve as CMake targets rather than as "-l..." flags.
+if(TARGET pinocchio::pinocchio AND NOT TARGET pinocchio)
+  add_library(pinocchio INTERFACE IMPORTED)
+  target_link_libraries(pinocchio INTERFACE pinocchio::pinocchio)
+endif()
+if(TARGET hpp-fcl::hpp-fcl AND NOT TARGET hpp-fcl)
+  add_library(hpp-fcl INTERFACE IMPORTED)
+  target_link_libraries(hpp-fcl INTERFACE hpp-fcl::hpp-fcl)
+endif()
+
+function(_sanitize_interface_paths target)
+  get_target_property(_iface_includes ${target} INTERFACE_INCLUDE_DIRECTORIES)
+  if(_iface_includes)
+    set(_filtered_includes "")
+    foreach(_dir ${_iface_includes})
+      if("${_dir}" MATCHES "^\\$<")
+        list(APPEND _filtered_includes "${_dir}")
+      elseif(IS_ABSOLUTE "${_dir}" AND NOT EXISTS "${_dir}")
+        # Drop stale/non-existent include directories from upstream exports.
+      else()
+        list(APPEND _filtered_includes "${_dir}")
+      endif()
+    endforeach()
+    set_target_properties(${target} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_filtered_includes}")
+  endif()
+
+  get_target_property(_iface_libs ${target} INTERFACE_LINK_LIBRARIES)
+  if(_iface_libs)
+    set(_filtered_libs "")
+    foreach(_lib ${_iface_libs})
+      if(_lib STREQUAL "pinocchio" OR _lib STREQUAL "hpp-fcl" OR _lib STREQUAL "PkgConfig::PINOCCHIO")
+        # Prefer proper CMake targets (pinocchio::pinocchio / hpp-fcl::hpp-fcl).
+      else()
+        list(APPEND _filtered_libs "${_lib}")
+      endif()
+    endforeach()
+    set_target_properties(${target} PROPERTIES INTERFACE_LINK_LIBRARIES "${_filtered_libs}")
+  endif()
+endfunction()
 
 # Resolve for the package path at compile time.
 configure_file (
@@ -43,7 +85,6 @@ configure_file (
 
 set(FLAGS
   # ${OCS2_CXX_FLAGS}
-  ${pinocchio_CFLAGS_OTHER}
   -Wno-ignored-attributes
   -Wno-invalid-partial-specialization   # to silence warning with unsupported Eigen Tensor
   -DPINOCCHIO_URDFDOM_TYPEDEF_SHARED_PTR
@@ -52,13 +93,8 @@ set(FLAGS
 
 include_directories(
   include
-  ${pinocchio_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
-)
-
-link_directories(
-  ${pinocchio_LIBRARY_DIRS}
 )
 
 # Legged robot interface library
@@ -86,14 +122,15 @@ add_library(${PROJECT_NAME} SHARED
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
   ${Boost_LIBRARIES}
-  ${pinocchio_LIBRARIES}
+  pinocchio::pinocchio
   dl
 )
-foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
-  if (NOT ${dep} MATCHES "ocs2_robotic_assets")
-    target_link_libraries(${PROJECT_NAME} PUBLIC ${dep}::${dep})
-  endif()
-endforeach()
+
+set(AMENT_TARGET_DEPENDENCIES ${AMENT_PACKAGE_DEPENDENCIES})
+list(REMOVE_ITEM AMENT_TARGET_DEPENDENCIES ocs2_robotic_assets)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC ${AMENT_TARGET_DEPENDENCIES})
+
+_sanitize_interface_paths(${PROJECT_NAME})
 
 target_compile_options(${PROJECT_NAME} PUBLIC ${FLAGS})
 
@@ -111,6 +148,7 @@ foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
 endforeach()
 ament_export_dependencies(Boost)
 ament_export_dependencies(Eigen3)
+ament_export_dependencies(pinocchio)
 
 install(TARGETS ${PROJECT_NAME}
   EXPORT export_${PROJECT_NAME}

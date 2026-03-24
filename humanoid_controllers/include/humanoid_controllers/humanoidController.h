@@ -23,6 +23,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <ocs2_msgs/msg/mpc_observation.hpp>
 
+#include <atomic>
 #include <chrono>
 
 namespace humanoid_controller{
@@ -51,8 +52,11 @@ class humanoidController {
   void ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg);
   void publishStandCommand();
   void publishStandCommand(const vector_t& torqueFeedforward);
+  void publishHoldCommand(const vector_t& torqueFeedforward);
   void publishDiagnosticStatus(bool fallbackMode, bool hasTorque = false, scalar_t torque0 = 0.0, scalar_t torque1 = 0.0,
                                scalar_t torque2 = 0.0);
+
+  void disableMpcWarmup() { mpcWarmupActive_ = false; }
 
   // Interface
   std::shared_ptr<HumanoidInterface> HumanoidInterface_;
@@ -93,9 +97,15 @@ class humanoidController {
   std::thread mpcThread_;
   std::atomic_bool controllerRunning_{}, mpcRunning_{};
   std::atomic_bool receivedJointState_{false}, receivedImu_{false};
+    std::atomic<std::int64_t> mpcAdvanceStartWallNs_{0};
+    std::atomic<std::int64_t> mpcAdvanceEndWallNs_{0};
+    std::atomic<std::uint64_t> mpcAdvanceCounter_{0};
   std::chrono::steady_clock::time_point lastJointStateWallTime_{};
   std::chrono::steady_clock::time_point lastImuWallTime_{};
   std::chrono::steady_clock::time_point lastDiagnosticWallTime_{};
+  bool rosTimeZeroValid_ = false;
+  double rosTimeZeroSec_ = 0.0;
+  double lastRosTimeSec_ = 0.0;
   bool controlBlendStartInitialized_ = false;
   bool initialStanceHoldActive_ = true;
   scalar_t startupCommandBlendDuration_ = 3.0;
@@ -109,7 +119,7 @@ class humanoidController {
   // MPC warm-up: run MPC loop on real sensor data for N seconds before commanding WBC torques
   bool mpcWarmupActive_ = true;
   int mpcWarmupIterations_ = 0;
-  static constexpr int kMpcWarmupMinIterations = 1500;  // ~3s at 500Hz update rate
+  int mpcWarmupMinIterations_ = 1500;  // ~3s at 500Hz update rate
   benchmark::RepeatedTimer mpcTimer_;
   benchmark::RepeatedTimer wbcTimer_;
   size_t jointNum_ = 12;
@@ -125,6 +135,7 @@ class humanoidController {
 class humanoidCheaterController : public humanoidController {
  protected:
   void setupStateEstimate(const std::string& taskFile, bool verbose) override;
+  void setupMpc() override;
 };
 
 }  // namespace humanoid_controller

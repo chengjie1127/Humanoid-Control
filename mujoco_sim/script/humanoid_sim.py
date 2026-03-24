@@ -10,6 +10,8 @@ from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import Float32MultiArray,Bool
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
+from rosgraph_msgs.msg import Clock
+from builtin_interfaces.msg import Time as BuiltinTime
 import time
 
 
@@ -43,12 +45,33 @@ def quat_wxyz_to_euler_xyz(quat_wxyz):
   yaw = np.arctan2(siny_cosp, cosy_cosp)
   return np.array([roll, pitch, yaw])
 
-init_joint_pos = np.array([-0.1, 0.0, 0.0, 0.25, -0.14, 0, -0.1, 0.0, 0.0, 0.25, -0.14, 0])
-init_base_pos = np.array([0, 0, 0.793])
+
+def quat_wxyz_to_xyzw(quat_wxyz):
+  w, x, y, z = quat_wxyz
+  return np.array([x, y, z, w])
+
+init_joint_pos = np.array([-0.30, 0.0, 0.0, 0.70, -0.40, 0, -0.30, 0.0, 0.0, 0.70, -0.40, 0])
+init_base_pos = np.array([0, 0, 0.759])
 init_base_eular_zyx = np.array([0.0, -0., 0.0])
 imu_eular_bias = np.array([0.0, 0.0, 0.0])
-default_stand_kp = np.array([150.0, 150.0, 80.0, 150.0, 50.0, 40.0, 150.0, 150.0, 80.0, 150.0, 50.0, 40.0])
-default_stand_kd = np.array([2.0, 2.0, 1.2, 2.0, 1.0, 0.8, 2.0, 2.0, 1.2, 2.0, 1.0, 0.8])
+default_stand_kp = np.array([250.0, 250.0, 120.0, 250.0, 120.0, 80.0, 250.0, 250.0, 120.0, 250.0, 120.0, 80.0])
+default_stand_kd = np.array([6.0, 6.0, 2.0, 6.0, 4.0, 2.5, 6.0, 6.0, 2.0, 6.0, 4.0, 2.5])
+
+# Canonical controller joint order (must match humanoid_interface::ModelSettings::jointNames)
+CONTROLLER_JOINT_NAMES = [
+  "left_hip_pitch_joint",
+  "left_hip_roll_joint",
+  "left_hip_yaw_joint",
+  "left_knee_joint",
+  "left_ankle_pitch_joint",
+  "left_ankle_roll_joint",
+  "right_hip_pitch_joint",
+  "right_hip_roll_joint",
+  "right_hip_yaw_joint",
+  "right_knee_joint",
+  "right_ankle_pitch_joint",
+  "right_ankle_roll_joint",
+]
 
 class HumanoidSim(MuJoCoBase):
   def __init__(self, xml_path, node):
@@ -70,10 +93,52 @@ class HumanoidSim(MuJoCoBase):
     self.targetKp = default_stand_kp.copy()
     self.targetKd = default_stand_kd.copy()
 
+    # Build joint/actuator index mapping so all arrays match the controller joint order.
+    self._use_joint_map = False
+    self._joint_names = CONTROLLER_JOINT_NAMES
+    self._qpos_adr = None
+    self._qvel_adr = None
+    self._act_adr = None
+    try:
+      qpos_adr = []
+      qvel_adr = []
+      for joint_name in self._joint_names:
+        jid = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_JOINT, joint_name)
+        if jid < 0:
+          raise RuntimeError(f"MuJoCo joint not found: {joint_name}")
+        qpos_adr.append(int(self.model.jnt_qposadr[jid]))
+        qvel_adr.append(int(self.model.jnt_dofadr[jid]))
+
+      act_for_joint = {}
+      for aid in range(self.model.nu):
+        trnid = self.model.actuator_trnid[aid]
+        jid = int(trnid[0])
+        if jid < 0:
+          continue
+        jname = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_JOINT, jid)
+        if jname and jname not in act_for_joint:
+          act_for_joint[jname] = aid
+
+      act_adr = []
+      for joint_name in self._joint_names:
+        if joint_name not in act_for_joint:
+          raise RuntimeError(f"No actuator found for joint: {joint_name}")
+        act_adr.append(int(act_for_joint[joint_name]))
+
+      self._qpos_adr = np.array(qpos_adr, dtype=np.int32)
+      self._qvel_adr = np.array(qvel_adr, dtype=np.int32)
+      self._act_adr = np.array(act_adr, dtype=np.int32)
+      self._use_joint_map = True
+      print(f"[HumanoidSim] Using joint-name mapping for commands/states (nu={self.model.nu}).")
+    except Exception as e:
+      self.node.get_logger().error(f"[HumanoidSim] Joint/actuator mapping failed; falling back to qpos[-12:] ordering: {e}")
+      self._use_joint_map = False
+
     self.pubJoints = self.node.create_publisher(Float32MultiArray, '/jointsPosVel', 10)
     self.pubOdom = self.node.create_publisher(Odometry, '/ground_truth/state', 10)
     self.pubImu = self.node.create_publisher(Imu, '/imu', 10)
     self.pubRealTorque = self.node.create_publisher(Float32MultiArray, '/realTorque', 10)
+    self.pubClock = self.node.create_publisher(Clock, '/clock', 10)
 
     self.node.create_subscription(Float32MultiArray, "/targetTorque", self.targetTorqueCallback, qos_profile_sensor_data) 
     self.node.create_subscription(Float32MultiArray, "/targetPos", self.targetPosCallback, qos_profile_sensor_data) 
@@ -90,7 +155,10 @@ class HumanoidSim(MuJoCoBase):
       base_quat_xyzw[1],
       base_quat_xyzw[2],
     ])
-    self.data.qpos[-12:] = init_joint_pos
+    if self._use_joint_map:
+      self.data.qpos[self._qpos_adr] = init_joint_pos
+    else:
+      self.data.qpos[-12:] = init_joint_pos
 
     self.data.qvel[:] = 0.0
 
@@ -99,6 +167,14 @@ class HumanoidSim(MuJoCoBase):
 
     # Initialize kinematics and sensors without advancing physics.
     mj.mj_forward(self.model, self.data)
+
+    try:
+      raw_quat = self.data.sensor('BodyQuat').data.copy()
+      raw_pos = self.data.sensor('BodyPos').data.copy()
+      print(f"[HumanoidSim] BodyQuat raw sensor (as returned by MuJoCo) = {raw_quat}")
+      print(f"[HumanoidSim] BodyPos raw sensor (as returned by MuJoCo) = {raw_pos}")
+    except Exception as e:
+      print(f"[HumanoidSim] Warning: could not read BodyQuat/BodyPos sensors at startup: {e}")
     # enable contact force visualization
     self.opt.flags[mj.mjtVisFlag.mjVIS_CONTACTFORCE] = True
 
@@ -110,6 +186,21 @@ class HumanoidSim(MuJoCoBase):
     mj.mjv_updateScene(self.model, self.data, self.opt, None, self.cam,
                         mj.mjtCatBit.mjCAT_ALL.value, self.scene)
     mj.mjr_render(viewport, self.scene, self.context)
+
+  def _sim_time_msg(self):
+    sec = int(self.data.time)
+    nanosec = int((self.data.time - sec) * 1e9)
+    if nanosec < 0:
+      nanosec = 0
+    if nanosec >= 1_000_000_000:
+      sec += nanosec // 1_000_000_000
+      nanosec = nanosec % 1_000_000_000
+    return BuiltinTime(sec=sec, nanosec=nanosec)
+
+  def _publish_clock(self):
+    msg = Clock()
+    msg.clock = self._sim_time_msg()
+    self.pubClock.publish(msg)
 
   def _geom_vertical_extent(self, geom_index):
     geom_type = self.model.geom_type[geom_index]
@@ -190,19 +281,39 @@ class HumanoidSim(MuJoCoBase):
     
 
   def targetTorqueCallback(self, data):
-    self.targetTorque = data.data
+    arr = np.asarray(data.data, dtype=np.float64)
+    if arr.size != 12:
+      self.node.get_logger().error(f"/targetTorque wrong size {arr.size} (expected 12)")
+      return
+    self.targetTorque = arr
 
   def targetPosCallback(self, data):
-    self.targetPos = data.data
+    arr = np.asarray(data.data, dtype=np.float64)
+    if arr.size != 12:
+      self.node.get_logger().error(f"/targetPos wrong size {arr.size} (expected 12)")
+      return
+    self.targetPos = arr
 
   def targetVelCallback(self, data):
-    self.targetVel = data.data 
+    arr = np.asarray(data.data, dtype=np.float64)
+    if arr.size != 12:
+      self.node.get_logger().error(f"/targetVel wrong size {arr.size} (expected 12)")
+      return
+    self.targetVel = arr
 
   def targetKpCallback(self, data):
-    self.targetKp = data.data
+    arr = np.asarray(data.data, dtype=np.float64)
+    if arr.size != 12:
+      self.node.get_logger().error(f"/targetKp wrong size {arr.size} (expected 12)")
+      return
+    self.targetKp = arr
 
   def targetKdCallback(self, data):
-    self.targetKd = data.data
+    arr = np.asarray(data.data, dtype=np.float64)
+    if arr.size != 12:
+      self.node.get_logger().error(f"/targetKd wrong size {arr.size} (expected 12)")
+      return
+    self.targetKd = arr
 
   def reset(self):
     # Set camera configuration
@@ -230,21 +341,34 @@ class HumanoidSim(MuJoCoBase):
         if simulation_active:
           if (time.time() - sim_epoch_start >= 1.0 / self.sim_rate):
             # MIT control
-            self.data.ctrl[:] = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
+            if self._use_joint_map:
+              q = self.data.qpos[self._qpos_adr].copy()
+              qd = self.data.qvel[self._qvel_adr].copy()
+              u = self.targetTorque + self.targetKp * (self.targetPos - q) + self.targetKd * (self.targetVel - qd)
+              # Apply in the controller joint order.
+              self.data.ctrl[self._act_adr] = u
+            else:
+              self.data.ctrl[:] = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
             # Step simulation environment
             mj.mj_step(self.model, self.data)
             sim_epoch_start = time.time()
+            self._publish_clock()
         else:
             # Advance local time frame minimally without physics steps so the outer GUI renders and rclpy updates
             simstart -= 1.0/60.0
             time.sleep(1.0/60.0)
+            self._publish_clock()
         
         if (self.data.time - publish_time >= 1.0 / 500.0):
           # * Publish joint positions and velocities
           jointsPosVel = Float32MultiArray()
           # get last 12 element of qpos and qvel
-          qp = self.data.qpos[-12:].copy()
-          qv = self.data.qvel[-12:].copy()
+          if self._use_joint_map:
+            qp = self.data.qpos[self._qpos_adr].copy()
+            qv = self.data.qvel[self._qvel_adr].copy()
+          else:
+            qp = self.data.qpos[-12:].copy()
+            qv = self.data.qvel[-12:].copy()
           jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
           self.pubJoints.publish(jointsPosVel)
@@ -252,17 +376,15 @@ class HumanoidSim(MuJoCoBase):
           bodyOdom = Odometry()
           pos = self.data.sensor('BodyPos').data.copy()
 
-          #add imu bias
-          ori = self.data.sensor('BodyQuat').data.copy()
-          # Ensure correct scipy XYZW quaternion mapping from MuJoCo WXYZ
-          eul = quat_wxyz_to_euler_xyz(ori)
-          eul += imu_eular_bias
-          ori_new = euler_xyz_to_quat_xyzw(eul)
+          # MuJoCo provides quaternions as (w, x, y, z). ROS messages use (x, y, z, w).
+          # Avoid Euler-angle conversions (they can introduce convention mistakes and singularities).
+          ori_wxyz = self.data.sensor('BodyQuat').data.copy()
+          ori_new = quat_wxyz_to_xyzw(ori_wxyz)
 
           vel = self.data.qvel[:3].copy()
           angVel = self.data.sensor('BodyGyro').data.copy()
 
-          bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
+          bodyOdom.header.stamp = self._sim_time_msg()
           bodyOdom.pose.pose.position.x = float(pos[0])
           bodyOdom.pose.pose.position.y = float(pos[1])
           bodyOdom.pose.pose.position.z = float(pos[2])
@@ -280,7 +402,7 @@ class HumanoidSim(MuJoCoBase):
 
           bodyImu = Imu()
           acc = self.data.sensor('BodyAcc').data.copy()
-          bodyImu.header.stamp = self.node.get_clock().now().to_msg()
+          bodyImu.header.stamp = self._sim_time_msg()
           bodyImu.angular_velocity.x = float(angVel[0])
           bodyImu.angular_velocity.y = float(angVel[1])
           bodyImu.angular_velocity.z = float(angVel[2])
@@ -300,7 +422,10 @@ class HumanoidSim(MuJoCoBase):
 
       if (self.data.time - torque_publish_time >= 1.0 / 40.0):
         targetTorque = Float32MultiArray()
-        targetTorque.data = self.data.ctrl[:].tolist()
+        if self._use_joint_map:
+          targetTorque.data = self.data.ctrl[self._act_adr].tolist()
+        else:
+          targetTorque.data = self.data.ctrl[:].tolist()
         self.pubRealTorque.publish(targetTorque)
         torque_publish_time = self.data.time
 
@@ -311,7 +436,10 @@ class HumanoidSim(MuJoCoBase):
         # * Publish joint positions and velocities
         jointsPosVel = Float32MultiArray()
         # get last 12 element of qpos and qvel
-        qp = self.data.qpos[-12:].copy()
+        if self._use_joint_map:
+          qp = self.data.qpos[self._qpos_adr].copy()
+        else:
+          qp = self.data.qpos[-12:].copy()
         qv = np.zeros(12)
         jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
@@ -320,15 +448,12 @@ class HumanoidSim(MuJoCoBase):
         bodyOdom = Odometry()
         pos = self.data.sensor('BodyPos').data.copy()
 
-        #add imu bias
-        ori = self.data.sensor('BodyQuat').data.copy()
-        eul = quat_wxyz_to_euler_xyz(ori)
-        eul += imu_eular_bias
-        ori_new = euler_xyz_to_quat_xyzw(eul)
+        ori_wxyz = self.data.sensor('BodyQuat').data.copy()
+        ori_new = quat_wxyz_to_xyzw(ori_wxyz)
 
         vel = self.data.qvel[:3].copy()
         angVel = self.data.sensor('BodyGyro').data.copy()
-        bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
+        bodyOdom.header.stamp = self._sim_time_msg()
         bodyOdom.pose.pose.position.x = float(pos[0])
         bodyOdom.pose.pose.position.y = float(pos[1])
         bodyOdom.pose.pose.position.z = float(pos[2])
@@ -345,7 +470,7 @@ class HumanoidSim(MuJoCoBase):
         self.pubOdom.publish(bodyOdom)
 
         bodyImu = Imu()
-        bodyImu.header.stamp = self.node.get_clock().now().to_msg()
+        bodyImu.header.stamp = self._sim_time_msg()
         bodyImu.angular_velocity.x = 0.0
         bodyImu.angular_velocity.y = 0.0
         bodyImu.angular_velocity.z = 0.0
@@ -357,6 +482,8 @@ class HumanoidSim(MuJoCoBase):
         bodyImu.orientation.z = float(ori_new[2])
         bodyImu.orientation.w = float(ori_new[3])
         self.pubImu.publish(bodyImu)
+
+        self._publish_clock()
 
       # get framebuffer viewport
       viewport_width, viewport_height = glfw.get_framebuffer_size(

@@ -33,6 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_centroidal_model/FactoryFunctions.h>
 #include <ocs2_core/Types.h>
 #include <ocs2_core/penalties/Penalties.h>
+#include <ocs2_core/soft_constraint/StateInputSoftBoxConstraint.h>
 #include <ocs2_ddp/DDP_Settings.h>
 #include <ocs2_ipm/IpmSettings.h>
 #include <ocs2_mpc/MPC_Settings.h>
@@ -98,6 +99,7 @@ class HumanoidInterface final : public RobotInterface {
 
   std::unique_ptr<StateInputCost> getBaseTrackingCost(const std::string& taskFile, const CentroidalModelInfo& info, bool verbose);
   matrix_t initializeInputCostWeight(const std::string& taskFile, const CentroidalModelInfo& info);
+  std::unique_ptr<StateInputCost> getJointLimitSoftConstraint(const PinocchioInterface& pinocchioInterface, const std::string& taskFile) const;
 
   std::pair<scalar_t, RelaxedBarrierPenalty::Config> loadFrictionConeSettings(const std::string& taskFile, bool verbose) const;
   std::unique_ptr<StateInputConstraint> getFrictionConeConstraint(size_t contactPointIndex, scalar_t frictionCoefficient);

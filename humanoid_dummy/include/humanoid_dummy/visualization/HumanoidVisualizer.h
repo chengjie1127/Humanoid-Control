@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <ocs2_msgs/msg/mpc_observation.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
@@ -76,7 +77,7 @@ class HumanoidVisualizer : public DummyObserver {
 
   void publishTrajectory(const std::vector<SystemObservation>& system_observation_array, scalar_t speed = 1.0);
 
-  void publishObservation(rclcpp::Time timeStamp, const SystemObservation& observation);
+  void publishObservation(rclcpp::Time timeStamp, const SystemObservation& observation, bool publishObservationMsg = true);
 
   void publishDesiredTrajectory(rclcpp::Time timeStamp, const TargetTrajectories& targetTrajectories);
 
@@ -97,6 +98,7 @@ class HumanoidVisualizer : public DummyObserver {
   std::shared_ptr<rclcpp::Node> node_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tfBroadcaster_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr jointStatePublisher_;
+  rclcpp::Publisher<ocs2_msgs::msg::MpcObservation>::SharedPtr observationPublisher_;
 
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr costDesiredBasePositionPublisher_;
   std::vector<rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr> costDesiredFeetPositionPublishers_;

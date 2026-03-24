@@ -15,21 +15,14 @@ find_package(humanoid_common REQUIRED)
 find_package(realtime_tools REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(pinocchio REQUIRED CONFIG)
 find_package(humanoid_interface REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(pinocchio REQUIRED pinocchio)
-
 include_directories(
         include
-        ${pinocchio_INCLUDE_DIRS}
-)
-
-link_directories(
-        ${pinocchio_LIBRARY_DIRS}
 )
 
 add_library(${PROJECT_NAME} SHARED
@@ -39,7 +32,7 @@ add_library(${PROJECT_NAME} SHARED
         )
 
 target_link_libraries(${PROJECT_NAME}
-        ${pinocchio_LIBRARIES}
+        pinocchio::pinocchio
         )
 ament_target_dependencies(${PROJECT_NAME} 
         rclcpp

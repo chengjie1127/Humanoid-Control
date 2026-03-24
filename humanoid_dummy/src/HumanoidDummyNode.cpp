@@ -28,12 +28,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************************************************************/
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/executors/single_threaded_executor.hpp>
 
 #include <ocs2_centroidal_model/CentroidalModelPinocchioMapping.h>
 #include <humanoid_interface/HumanoidInterface.h>
 #include <ocs2_pinocchio_interface/PinocchioEndEffectorKinematics.h>
 #include <ocs2_ros_interfaces/mrt/MRT_ROS_Dummy_Loop.h>
 #include <ocs2_ros_interfaces/mrt/MRT_ROS_Interface.h>
+#include <ocs2_msgs/srv/reset.hpp>
 
 #include "humanoid_dummy/visualization/HumanoidVisualizer.h"
 
@@ -41,6 +43,7 @@ using namespace ocs2;
 using namespace humanoid;
 
 int main(int argc, char** argv) {
+  using namespace std::chrono_literals;
   const std::string robotName = "humanoid";
 
   // Initialize ros node
@@ -58,10 +61,69 @@ int main(int argc, char** argv) {
   // Robot interface
   HumanoidInterface interface(taskFile, urdfFile, referenceFile);
 
+  // Initial state
+  SystemObservation initObservation;
+  initObservation.state = interface.getInitialState();
+  initObservation.input = vector_t::Zero(interface.getCentroidalModelInfo().inputDim);
+  initObservation.mode = ModeNumber::STANCE;
+
+  // Initial command
+  TargetTrajectories initTargetTrajectories({0.0}, {initObservation.state}, {initObservation.input});
+
   // MRT
   MRT_ROS_Interface mrt(robotName);
   mrt.initRollout(&interface.getRollout());
   mrt.launchNodes(nodeHandle);
+
+  // Reset MPC after the MRT ROS interfaces are created but before entering the dummy loop.
+  mrt.resetMpcNode(initTargetTrajectories);
+
+  // Some OCS2 setups still require a successful call to the reset service before the MPC starts processing
+  // observations (otherwise it may keep warning "MPC should be reset first"). Make this bringup robust by
+  // explicitly calling the reset service here.
+  {
+    const std::string resetServiceName = "/" + robotName + "_mpc_reset";
+    auto resetClient = nodeHandle->create_client<ocs2_msgs::srv::Reset>(resetServiceName);
+
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(nodeHandle);
+
+    RCLCPP_INFO(nodeHandle->get_logger(), "Waiting for MPC reset service: %s", resetServiceName.c_str());
+    while (rclcpp::ok() && !resetClient->wait_for_service(1s)) {
+      RCLCPP_WARN_THROTTLE(nodeHandle->get_logger(), *nodeHandle->get_clock(), 5000,
+                           "Still waiting for MPC reset service: %s", resetServiceName.c_str());
+    }
+
+    if (rclcpp::ok()) {
+      auto request = std::make_shared<ocs2_msgs::srv::Reset::Request>();
+      request->reset = true;
+      request->target_trajectories.time_trajectory = {0.0};
+
+      ocs2_msgs::msg::MpcState stateMsg;
+      stateMsg.value.resize(static_cast<size_t>(initObservation.state.size()));
+      for (size_t i = 0; i < stateMsg.value.size(); ++i) {
+        stateMsg.value[i] = static_cast<float>(initObservation.state(static_cast<vector_t::Index>(i)));
+      }
+
+      ocs2_msgs::msg::MpcInput inputMsg;
+      inputMsg.value.resize(static_cast<size_t>(initObservation.input.size()));
+      for (size_t i = 0; i < inputMsg.value.size(); ++i) {
+        inputMsg.value[i] = static_cast<float>(initObservation.input(static_cast<vector_t::Index>(i)));
+      }
+
+      request->target_trajectories.state_trajectory = {stateMsg};
+      request->target_trajectories.input_trajectory = {inputMsg};
+
+      auto future = resetClient->async_send_request(request);
+      const auto result = executor.spin_until_future_complete(future, 30s);
+
+      if (result == rclcpp::FutureReturnCode::SUCCESS && future.get()->done) {
+        RCLCPP_INFO(nodeHandle->get_logger(), "MPC reset service succeeded (%s)", resetServiceName.c_str());
+      } else {
+        RCLCPP_WARN(nodeHandle->get_logger(), "MPC reset service did not succeed (%s)", resetServiceName.c_str());
+      }
+    }
+  }
 
   // Visualization
   CentroidalModelPinocchioMapping pinocchioMapping(interface.getCentroidalModelInfo());
@@ -74,15 +136,6 @@ int main(int argc, char** argv) {
   MRT_ROS_Dummy_Loop HumanoidDummySimulator(mrt, interface.mpcSettings().mrtDesiredFrequency_,
                                                interface.mpcSettings().mpcDesiredFrequency_);
   HumanoidDummySimulator.subscribeObservers({humanoidVisualizer});
-
-  // Initial state
-  SystemObservation initObservation;
-  initObservation.state = interface.getInitialState();
-  initObservation.input = vector_t::Zero(interface.getCentroidalModelInfo().inputDim);
-  initObservation.mode = ModeNumber::STANCE;
-
-  // Initial command
-  TargetTrajectories initTargetTrajectories({0.0}, {initObservation.state}, {initObservation.input});
 
   // run dummy
   HumanoidDummySimulator.run(initObservation, initTargetTrajectories);

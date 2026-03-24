@@ -27,6 +27,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************************************************************/
 
+#include <algorithm>
+#include <array>
 #include <iostream>
 #include <string>
 
@@ -43,6 +45,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_centroidal_model/ModelHelperFunctions.h>
 #include <ocs2_core/misc/Display.h>
 #include <ocs2_core/misc/LoadStdVectorOfPair.h>
+#include <ocs2_core/soft_constraint/StateInputSoftBoxConstraint.h>
 #include <ocs2_core/soft_constraint/StateInputSoftConstraint.h>
 #include <ocs2_core/soft_constraint/StateSoftConstraint.h>
 #include <ocs2_oc/synchronized_module/SolverSynchronizedModule.h>
@@ -64,6 +67,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace ocs2 {
 namespace humanoid {
+
+namespace {
+const std::array<size_t, 6> kCriticalStabilityJointIndices{{1, 2, 5, 7, 8, 11}};
+}
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -151,6 +158,7 @@ void HumanoidInterface::setupOptimalControlProblem(const std::string& taskFile, 
 
   // Cost terms
   problemPtr_->costPtr->add("baseTrackingCost", getBaseTrackingCost(taskFile, centroidalModelInfo_, false));
+  problemPtr_->softConstraintPtr->add("jointLimits", getJointLimitSoftConstraint(*pinocchioInterfacePtr_, taskFile));
 
   // Constraint terms
   // friction cone settings
@@ -191,6 +199,7 @@ void HumanoidInterface::setupOptimalControlProblem(const std::string& taskFile, 
                                             getZeroVelocityConstraint(*eeKinematicsPtr, i, useAnalyticalGradientsConstraints));
     problemPtr_->equalityConstraintPtr->add(footName + "_normalVelocity",
                                             getNormalVelocityConstraint(*eeKinematicsPtr, i, useAnalyticalGradientsConstraints));
+    problemPtr_->equalityConstraintPtr->add(footName + "_footRoll", getFootRollConstraint(i));
   }
             // Self-collision avoidance constraint
     problemPtr_->stateSoftConstraintPtr->add("selfCollision",
@@ -273,6 +282,48 @@ matrix_t HumanoidInterface::initializeInputCostWeight(const std::string& taskFil
     R.bottomRightCorner(info.actuatedDofNum, info.actuatedDofNum) =
             baseToFeetJacobians.transpose() * R_taskspace.bottomRightCorner(totalContactDim, totalContactDim) * baseToFeetJacobians;
     return R;
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+std::unique_ptr<StateInputCost> HumanoidInterface::getJointLimitSoftConstraint(const PinocchioInterface& pinocchioInterface,
+                                                                               const std::string& taskFile) const {
+    boost::property_tree::ptree pt;
+    boost::property_tree::read_info(taskFile, pt);
+
+    bool activateJointPositionLimit = true;
+    loadData::loadPtreeValue(pt, activateJointPositionLimit, "jointPositionLimits.activate", true);
+
+    std::vector<StateInputSoftBoxConstraint::BoxConstraint> stateLimits;
+    const auto& model = pinocchioInterface.getModel();
+    const size_t jointDof = centroidalModelInfo_.actuatedDofNum;
+    const size_t stateJointOffset = centroidalModelInfo_.stateDim - jointDof;
+
+    if (activateJointPositionLimit) {
+        scalar_t muPositionLimits = 1e-2;
+        scalar_t deltaPositionLimits = 1e-3;
+        scalar_t positionMargin = 0.02;
+
+        loadData::loadPtreeValue(pt, muPositionLimits, "jointPositionLimits.mu", true);
+        loadData::loadPtreeValue(pt, deltaPositionLimits, "jointPositionLimits.delta", true);
+        loadData::loadPtreeValue(pt, positionMargin, "jointPositionLimits.margin", true);
+
+        stateLimits.reserve(kCriticalStabilityJointIndices.size());
+        for (size_t i : kCriticalStabilityJointIndices) {
+            StateInputSoftBoxConstraint::BoxConstraint stateConstraint;
+            stateConstraint.index = stateJointOffset + i;
+            stateConstraint.lowerBound = model.lowerPositionLimit.tail(jointDof)(static_cast<vector_t::Index>(i)) + positionMargin;
+            stateConstraint.upperBound = model.upperPositionLimit.tail(jointDof)(static_cast<vector_t::Index>(i)) - positionMargin;
+            stateConstraint.penaltyPtr = std::make_unique<RelaxedBarrierPenalty>(
+                RelaxedBarrierPenalty::Config{muPositionLimits, deltaPositionLimits});
+            stateLimits.push_back(std::move(stateConstraint));
+        }
+    }
+
+    auto jointLimitConstraint = std::make_unique<StateInputSoftBoxConstraint>(stateLimits, std::vector<StateInputSoftBoxConstraint::BoxConstraint>{});
+    jointLimitConstraint->initializeOffset(0.0, vector_t::Zero(centroidalModelInfo_.stateDim), vector_t::Zero(centroidalModelInfo_.inputDim));
+    return jointLimitConstraint;
 }
 
 /******************************************************************************************************/

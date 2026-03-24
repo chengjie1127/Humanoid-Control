@@ -27,6 +27,8 @@ set(AMENT_PACKAGE_DEPENDENCIES
 
 find_package(ament_cmake REQUIRED)
 
+find_package(pinocchio REQUIRED CONFIG)
+
 foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
   find_package(${dep} REQUIRED)
 endforeach()
@@ -40,19 +42,11 @@ find_package(Boost REQUIRED COMPONENTS
 
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(pinocchio REQUIRED pinocchio)
-
 
 include_directories(
   include
-  ${pinocchio_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
-)
-
-link_directories(
-  ${pinocchio_LIBRARY_DIRS}
 )
 
 # Main library
@@ -63,7 +57,7 @@ add_library(${PROJECT_NAME} SHARED
 )
 target_link_libraries(${PROJECT_NAME}
   ${Boost_LIBRARIES}
-  ${pinocchio_LIBRARIES}
+  pinocchio::pinocchio
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -159,6 +153,11 @@ install(DIRECTORY include/${PROJECT_NAME}/
 
 install(DIRECTORY launch rviz
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  scripts/send_goal_pose.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_export_include_directories(include)

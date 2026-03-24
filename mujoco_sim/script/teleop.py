@@ -34,12 +34,14 @@ class KeyboardController:
         self.last_published_was_zero = False
         self.last_logged_command = None
         self.current_gait = 'stance'  # track current gait
+        self._last_gait_publish_time = 0.0
 
-    def publish_gait(self, gait_name):
+    def publish_gait(self, gait_name, *, log: bool = True):
         if gait_name in GAITS:
             self.gait_publisher.publish(GAITS[gait_name])
             self.current_gait = gait_name
-            self.node.get_logger().info(f'Gait -> {gait_name}')
+            if log:
+                self.node.get_logger().info(f'Gait -> {gait_name}')
         else:
             self.node.get_logger().warn(f'Unknown gait: {gait_name}')
             return
@@ -123,6 +125,9 @@ class KeyboardController:
         self.twist_msg.linear.x = 0.0
         self.twist_msg.linear.y = 0.0
         self.twist_msg.angular.z = 0.0
+        # If we were walking/stepping, revert gait to stance when the user releases keys.
+        if self.current_gait != 'stance':
+            self.publish_gait('stance')
 
 def main(args=None):
     rclpy.init(args=args)
@@ -133,11 +138,23 @@ def main(args=None):
     node.get_logger().info("Gait keys: 0=stance, 1=pace, 2=walk, 3=trot (auto-switches to pace on first move key)")
 
     controller = KeyboardController(node)
+    # Ensure the controller starts in stance even if teleop was previously used to command a gait.
+    # (ModeSchedule QoS is volatile, so we publish once at startup and also revert on stop.)
+    controller.publish_gait('stance')
 
     def ros_publish():
         while rclpy.ok():
             try:
+                # Periodically republish gait so the controller reliably receives it (QoS is volatile).
+                now = time.time()
+                if (now - controller._last_gait_publish_time) >= 1.0:
+                    controller.publish_gait(controller.current_gait, log=False)
+                    controller._last_gait_publish_time = now
+
                 is_zero_command = controller.is_zero_command()
+                # When the command returns to zero, automatically revert gait to stance.
+                if is_zero_command and not controller.last_published_was_zero and controller.current_gait != 'stance':
+                    controller.publish_gait('stance')
                 if (not is_zero_command) or (not controller.last_published_was_zero):
                     controller.publisher.publish(controller.twist_msg)
                     controller.last_published_was_zero = is_zero_command

@@ -23,6 +23,7 @@
 #include <humanoid_interface/common/utils.h>
 #include <humanoid_wbc/WeightedWbc.h>
 #include <array>
+#include <limits>
 #include <sstream>
 
 
@@ -33,10 +34,14 @@ using namespace humanoid;
 
 namespace {
 // Stance PD gains (used during warmup, stance hold, and start of walking blend)
-constexpr std::array<float, 12> kStandKp = {150.0F, 150.0F, 80.0F, 150.0F, 50.0F, 40.0F, 150.0F, 150.0F, 80.0F, 150.0F, 50.0F, 40.0F};
-constexpr std::array<float, 12> kStandKd = {2.0F, 2.0F, 1.2F, 2.0F, 1.0F, 0.8F, 2.0F, 2.0F, 1.2F, 2.0F, 1.0F, 0.8F};
-// Walk PD gains: low to avoid fighting WBC torques during walking
-constexpr std::array<float, 12> kWalkKp = {20.0F, 20.0F, 10.0F, 20.0F, 8.0F, 6.0F, 20.0F, 20.0F, 10.0F, 20.0F, 8.0F, 6.0F};
+// Stand gains tuned for MuJoCo: higher stiffness/damping on knee + ankle pitch to prevent
+// gradual forward tip and joint collapse before the whole-body controller fully stabilizes.
+constexpr std::array<float, 12> kStandKp = {250.0F, 250.0F, 120.0F, 250.0F, 120.0F, 80.0F,
+                                           250.0F, 250.0F, 120.0F, 250.0F, 120.0F, 80.0F};
+constexpr std::array<float, 12> kStandKd = {6.0F, 6.0F, 2.0F, 6.0F, 4.0F, 2.5F,
+                                           6.0F, 6.0F, 2.0F, 6.0F, 4.0F, 2.5F};
+// Walk PD gains: increased to provide robust tracking against modeling errors
+constexpr std::array<float, 12> kWalkKp = {60.0F, 60.0F, 40.0F, 60.0F, 40.0F, 30.0F, 60.0F, 60.0F, 40.0F, 60.0F, 40.0F, 30.0F};
 constexpr std::array<float, 12> kWalkKd = {8.0F, 8.0F, 8.0F, 8.0F, 4.0F, 3.2F, 8.0F, 8.0F, 8.0F, 8.0F, 4.0F, 3.2F};
 }
 
@@ -74,7 +79,7 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   //TODO: setup hardware controller interface
   //create a ROS subscriber to receive the joint pos and vel
   jointPos_ = vector_t::Zero(jointNum_);
-  jointPos_ << -0.1, 0.0, 0.0, 0.25, -0.14, 0, -0.1, 0.0, 0.0, 0.25, -0.14, 0;
+  jointPos_ << -0.30, 0.0, 0.0, 0.70, -0.40, 0, -0.30, 0.0, 0.0, 0.70, -0.40, 0;
   jointVel_ = vector_t::Zero(jointNum_);
   quat_ = Eigen::Quaternion<scalar_t>(1, 0, 0, 0);
   angularVel_.setZero();
@@ -147,6 +152,12 @@ void humanoidController::starting(const rclcpp::Time& time) {
     rclcpp::sleep_for(std::chrono::milliseconds(2));
   }
 
+  // Use a controller-local time base: OCS2 typically assumes time starts at 0.
+  // We derive it from ROS time (/clock in simulation) by subtracting an offset.
+  rosTimeZeroSec_ = time.seconds();
+  lastRosTimeSec_ = rosTimeZeroSec_;
+  rosTimeZeroValid_ = true;
+
   // Initial state
   currentObservation_.state = vector_t::Zero(HumanoidInterface_->getCentroidalModelInfo().stateDim);
   currentObservation_.state(8) = 0.75;
@@ -187,9 +198,35 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     return;
   }
 
+  // MPC thread watchdog: helps diagnose policy staleness (thread stopped vs blocked vs slow).
+  if (mpcRunning_) {
+    const auto wallNow = std::chrono::steady_clock::now();
+    const std::int64_t wallNowNs =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(wallNow.time_since_epoch()).count();
+    const std::int64_t startNs = mpcAdvanceStartWallNs_.load(std::memory_order_relaxed);
+    const std::int64_t endNs = mpcAdvanceEndWallNs_.load(std::memory_order_relaxed);
+    const std::uint64_t count = mpcAdvanceCounter_.load(std::memory_order_relaxed);
+
+    if (startNs > 0 && endNs > 0 && startNs > endNs) {
+      const double inProgressSec = static_cast<double>(wallNowNs - startNs) * 1e-9;
+      if (inProgressSec > 1.0) {
+        RCLCPP_WARN_THROTTLE(controllerNh_->get_logger(), *controllerNh_->get_clock(), 1000,
+                             "[MpcWatchdog] advanceMpc appears in-progress for %.3fs (count=%lu). Possible hang.",
+                             inProgressSec, static_cast<unsigned long>(count));
+      }
+    } else {
+      const double sinceEndSec = (endNs > 0) ? static_cast<double>(wallNowNs - endNs) * 1e-9 : std::numeric_limits<double>::infinity();
+      if (sinceEndSec > 2.0) {
+        RCLCPP_WARN_THROTTLE(controllerNh_->get_logger(), *controllerNh_->get_clock(), 1000,
+                             "[MpcWatchdog] no advanceMpc completion for %.3fs (count=%lu).",
+                             sinceEndSec, static_cast<unsigned long>(count));
+      }
+    }
+  }
+
   // MPC warm-up: run full MPC+WBC pipeline but gradually ramp up WBC torque feedforward.
   // This lets the MPC converge on real sensor data while smoothly transitioning from PD-only to full WBC control.
-  if (mpcWarmupActive_) {
+  if (mpcWarmupActive_ && mpcWarmupMinIterations_ > 0) {
     mpcWarmupIterations_++;
     try {
       updateStateEstimation(time, period);
@@ -204,7 +241,7 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
       const vector_t& torque = x.tail(jointNum_);
 
       // Ramp torque blend from 0 to 1 over the warm-up period
-      scalar_t blend = std::clamp(static_cast<scalar_t>(mpcWarmupIterations_) / static_cast<scalar_t>(kMpcWarmupMinIterations), 0.0, 1.0);
+      scalar_t blend = std::clamp(static_cast<scalar_t>(mpcWarmupIterations_) / static_cast<scalar_t>(mpcWarmupMinIterations_), 0.0, 1.0);
       vector_t blendedTorque = blend * torque;
       publishStandCommand(blendedTorque);
       publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
@@ -214,7 +251,7 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
       publishStandCommand();
     }
 
-    if (mpcWarmupIterations_ >= kMpcWarmupMinIterations) {
+    if (mpcWarmupIterations_ >= mpcWarmupMinIterations_) {
       mpcWarmupActive_ = false;
       RCLCPP_INFO_STREAM(controllerNh_->get_logger(), 
           "MPC warm-up complete after " << mpcWarmupIterations_ << " iterations.");
@@ -232,9 +269,82 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     // Load the latest MPC policy
     mpcMrtInterface_->updatePolicy();
 
-    // Evaluate the current policy
+    // Evaluate the current policy.
+    // Guard against requesting a time beyond the last available policy point;
+    // this can happen when the MPC thread lags and otherwise spams warnings and
+    // forces extrapolation.
     vector_t optimizedState, optimizedInput;
-    mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
+    scalar_t policyEvalTime = currentObservation_.time;
+    {
+      const auto& policy = mpcMrtInterface_->getPolicy();
+      if (!policy.timeTrajectory_.empty()) {
+        const scalar_t policyEndTime = policy.timeTrajectory_.back();
+        if (policyEvalTime > policyEndTime) {
+          const scalar_t policyLagSec = policyEvalTime - policyEndTime;
+
+          // If the MPC thread is wedged (advanceMpc stalled), the policy can become
+          // arbitrarily stale. Continuing to apply WBC feedforward based on a stale
+          // policy often destabilizes the robot. In that case, fall back to the
+          // conservative PD stand command until MPC recovers.
+          constexpr scalar_t kMaxPolicyLagSec = 0.05;  // 50ms
+          if (policyLagSec > kMaxPolicyLagSec) {
+            RCLCPP_WARN_THROTTLE(
+                controllerNh_->get_logger(), *controllerNh_->get_clock(), 1000,
+                "MPC policy too stale (lag=%.3fs, now=%.3f, policy_end=%.3f). Falling back to PD stand.",
+                policyLagSec, currentObservation_.time, policyEndTime);
+            publishDiagnosticStatus(true);
+            publishStandCommand();
+            return;
+          }
+
+          policyEvalTime = policyEndTime;
+          RCLCPP_WARN_THROTTLE(
+              controllerNh_->get_logger(), *controllerNh_->get_clock(), 1000,
+              "MPC policy is stale (now=%.3f > policy_end=%.3f). Clamping evaluation time.",
+              currentObservation_.time, policyEndTime);
+        }
+      }
+    }
+    mpcMrtInterface_->evaluatePolicy(policyEvalTime, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
+
+    // Lightweight debug to confirm that a STANCE gait actually stays in STANCE,
+    // and to catch any unexpected policy schedules that would release stance hold.
+    {
+      const auto& modeSequence = mpcMrtInterface_->getPolicy().modeSchedule_.modeSequence;
+      bool upcomingNonStance = false;
+      for (const auto& mode : modeSequence) {
+        if (mode != ModeNumber::STANCE) {
+          upcomingNonStance = true;
+          break;
+        }
+      }
+
+      if (initialStanceHoldActive_) {
+        std::ostringstream modeSeqStream;
+        modeSeqStream << "[";
+        const size_t maxPrint = 10;
+        for (size_t i = 0; i < modeSequence.size() && i < maxPrint; ++i) {
+          modeSeqStream << modeSequence[i];
+          if (i + 1 < modeSequence.size() && i + 1 < maxPrint) {
+            modeSeqStream << ",";
+          }
+        }
+        if (modeSequence.size() > maxPrint) {
+          modeSeqStream << ",...";
+        }
+        modeSeqStream << "]";
+
+        RCLCPP_INFO_THROTTLE(
+            controllerNh_->get_logger(), *controllerNh_->get_clock(), 1000,
+            "[StanceHold] active=1 plannedMode=%d upcomingNonStance=%d policyModeSeq=%s",
+            static_cast<int>(plannedMode_), static_cast<int>(upcomingNonStance), modeSeqStream.str().c_str());
+      } else {
+        RCLCPP_INFO_THROTTLE(
+            controllerNh_->get_logger(), *controllerNh_->get_clock(), 1000,
+            "[StanceHold] active=0 plannedMode=%d upcomingNonStance=%d",
+            static_cast<int>(plannedMode_), static_cast<int>(upcomingNonStance));
+      }
+    }
 
     // Whole body control
     currentObservation_.input = optimizedInput;
@@ -256,21 +366,35 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     posDes = posDes + 0.5 * wbc_planned_joint_acc * dt * dt;
     velDes = velDes + wbc_planned_joint_acc * dt;
 
-    // Release stance hold when first non-STANCE mode is planned
-    if (initialStanceHoldActive_ && plannedMode_ != ModeNumber::STANCE) {
-      RCLCPP_INFO_STREAM(controllerNh_->get_logger(),
-          "Initial stance hold released (mode=" << plannedMode_ << ")");
-      initialStanceHoldActive_ = false;
-      walkingBlendActive_ = true;
-      walkingBlendIterations_ = 0;
-      filteredWalkTorque_ = torque;
-      walkTorqueFilterInitialized_ = true;
+    // Release stance hold when first non-STANCE mode is planned or upcoming in the policy
+    if (initialStanceHoldActive_) {
+      bool upcomingNonStance = false;
+      const auto& modeSequence = mpcMrtInterface_->getPolicy().modeSchedule_.modeSequence;
+      for (const auto& mode : modeSequence) {
+        if (mode != ModeNumber::STANCE) {
+          upcomingNonStance = true;
+          break;
+        }
+      }
+
+      if (plannedMode_ != ModeNumber::STANCE || upcomingNonStance) {
+        RCLCPP_INFO_STREAM(controllerNh_->get_logger(),
+            "Initial stance hold released (mode=" << plannedMode_ << ", upcomingNonStance=" << upcomingNonStance << ")");
+        initialStanceHoldActive_ = false;
+        walkingBlendActive_ = true;
+        walkingBlendIterations_ = 0;
+        filteredWalkTorque_ = torque;
+        walkTorqueFilterInitialized_ = true;
+      }
     }
 
     // Safety check, if failed, stop the controller
     if (!safetyChecker_->check(currentObservation_, optimizedState, optimizedInput)) {
       RCLCPP_ERROR_STREAM(controllerNh_->get_logger(), "[humanoid Controller] Safety check failed, stopping the controller.");
       publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
+      // Safety trips typically mean the robot is already in an extreme orientation.
+      // Do not keep applying WBC feedforward torque (it can thrash / amplify the fall).
+      // Fall back to a conservative joint-space PD stand command.
       publishStandCommand();
       //TODO: send the stop command to hardware interface
       return;
@@ -279,7 +403,10 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     // During stance hold: WBC torque + PD to default joint positions (proven stable)
     if (initialStanceHoldActive_ && plannedMode_ == ModeNumber::STANCE) {
       publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
-      publishStandCommand(torque);
+
+      // Hold current joint angles (no posture correction) while applying WBC feedforward torque.
+      // This avoids injecting large PD torques that can fight the WBC solution.
+      publishHoldCommand(torque);
 
       robotVisualizer_->update(currentObservation_, mpcMrtInterface_->getPolicy(), mpcMrtInterface_->getCommand());
       observationPublisher_->publish(ros_msg_conversions::createObservationMsg(currentObservation_));
@@ -343,9 +470,9 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
 
     // Mode-dependent PD: reduce PD gains for swing legs to avoid fighting WBC
     // The WBC already computes optimal torques for swing trajectory tracking;
-    // PD overlay causes torque saturation at actuator limits.
-    constexpr float kSwingKp = 0.0f;   // No position PD for swing legs (WBC handles it)
-    constexpr float kSwingKd = 1.5f;   // Small damping only
+    // but moderate PD overlay is required in imperfect physics simulation.
+    constexpr float kSwingKp = 40.0f;   // Provided moderate position PD for swing legs
+    constexpr float kSwingKd = 4.0f;    // Increased damping
     if (plannedMode_ == ModeNumber::LCONTACT) {
       // Left foot on ground → right leg (joints 6-11) is swinging
       for (int i = 6; i < 12; i++) {
@@ -441,7 +568,23 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   stateEstimate_->updateContact(contactFlag);
   stateEstimate_->updateImu(quat, angularVel, linearAccel, orientationCovariance, angularVelCovariance, linearAccelCovariance);
   measuredRbdState_ = stateEstimate_->update(time, period);
-  currentObservation_.time += period.seconds();
+  // OCS2 assumes a local timebase starting at 0. Use ROS time (/clock) but convert
+  // it to controller-relative time to avoid huge absolute timestamps.
+  const double rosNowSec = time.seconds();
+  if (!rosTimeZeroValid_) {
+    rosTimeZeroSec_ = rosNowSec;
+    lastRosTimeSec_ = rosNowSec;
+    rosTimeZeroValid_ = true;
+  }
+  // Handle simulation time resets (e.g. restarting simulator without restarting all nodes).
+  if (rosNowSec + 1e-6 < lastRosTimeSec_) {
+    RCLCPP_WARN_STREAM(controllerNh_->get_logger(),
+                       "ROS time jumped back (" << lastRosTimeSec_ << " -> " << rosNowSec
+                                                << "). Resetting controller time base.");
+    rosTimeZeroSec_ = rosNowSec;
+  }
+  lastRosTimeSec_ = rosNowSec;
+  currentObservation_.time = std::max(0.0, rosNowSec - rosTimeZeroSec_);
   scalar_t yawLast = currentObservation_.state(9);
   currentObservation_.state = rbdConversions_->computeCentroidalStateFromRbdModel(measuredRbdState_);
   currentObservation_.state(9) = yawLast + angles::shortest_angular_distance(yawLast, currentObservation_.state(9));
@@ -486,6 +629,34 @@ void humanoidController::publishStandCommand(const vector_t& torqueFeedforward) 
   targetPosMsg.data.reserve(jointNum_);
   for (size_t i = 0; i < jointNum_; ++i) {
     targetPosMsg.data.push_back(static_cast<float>(defalutJointPos_(i)));
+  }
+
+  std_msgs::msg::Float32MultiArray targetVelMsg;
+  targetVelMsg.data.assign(jointNum_, 0.0F);
+
+  std_msgs::msg::Float32MultiArray targetKpMsg;
+  targetKpMsg.data.assign(kStandKp.begin(), kStandKp.end());
+  std_msgs::msg::Float32MultiArray targetKdMsg;
+  targetKdMsg.data.assign(kStandKd.begin(), kStandKd.end());
+
+  targetTorquePub_->publish(targetTorqueMsg);
+  targetPosPub_->publish(targetPosMsg);
+  targetVelPub_->publish(targetVelMsg);
+  targetKpPub_->publish(targetKpMsg);
+  targetKdPub_->publish(targetKdMsg);
+}
+
+void humanoidController::publishHoldCommand(const vector_t& torqueFeedforward) {
+  std_msgs::msg::Float32MultiArray targetTorqueMsg;
+  targetTorqueMsg.data.reserve(jointNum_);
+  for (size_t i = 0; i < jointNum_; ++i) {
+    targetTorqueMsg.data.push_back(static_cast<float>(torqueFeedforward(i)));
+  }
+
+  std_msgs::msg::Float32MultiArray targetPosMsg;
+  targetPosMsg.data.reserve(jointNum_);
+  for (size_t i = 0; i < jointNum_; ++i) {
+    targetPosMsg.data.push_back(static_cast<float>(jointPos_(i)));
   }
 
   std_msgs::msg::Float32MultiArray targetVelMsg;
@@ -583,6 +754,25 @@ void humanoidController::setupMpc() {
   observationPublisher_ = controllerNh_->create_publisher<ocs2_msgs::msg::MpcObservation>(robotName + "_mpc_observation", 1);
 }
 
+void humanoidCheaterController::setupMpc() {
+  mpc_ = std::make_shared<SqpMpc>(HumanoidInterface_->mpcSettings(), HumanoidInterface_->sqpSettings(),
+                                 HumanoidInterface_->getOptimalControlProblem(), HumanoidInterface_->getInitializer());
+  rbdConversions_ = std::make_shared<CentroidalModelRbdConversions>(HumanoidInterface_->getPinocchioInterface(),
+                                                                   HumanoidInterface_->getCentroidalModelInfo());
+
+  const std::string robotName = "humanoid";
+
+  // For MuJoCo cheat-control STANCE stabilization we don't rely on live gait schedule updates.
+  // Avoid registering synchronized modules (e.g., GaitReceiver) to reduce the risk of blocking
+  // inside advanceMpc().
+
+  auto rosReferenceManagerPtr = std::make_shared<RosReferenceManager>(robotName, HumanoidInterface_->getReferenceManagerPtr());
+  rosReferenceManagerPtr->subscribe(controllerNh_);
+  mpc_->getSolverPtr()->setReferenceManager(rosReferenceManagerPtr);
+
+  observationPublisher_ = controllerNh_->create_publisher<ocs2_msgs::msg::MpcObservation>(robotName + "_mpc_observation", 1);
+}
+
 void humanoidController::setupMrt() {
   mpcMrtInterface_ = std::make_shared<MPC_MRT_Interface>(*mpc_);
   mpcMrtInterface_->initRollout(&HumanoidInterface_->getRollout());
@@ -590,14 +780,35 @@ void humanoidController::setupMrt() {
 
   controllerRunning_ = true;
   mpcThread_ = std::thread([&]() {
+    RCLCPP_INFO_STREAM(controllerNh_->get_logger(), "[MpcThread] started");
+    auto lastHeartbeat = std::chrono::steady_clock::now();
+    size_t advanceCounter = 0;
     while (controllerRunning_) {
       try {
         executeAndSleep(
             [&]() {
               if (mpcRunning_) {
                 mpcTimer_.startTimer();
+                const auto startWall = std::chrono::steady_clock::now();
+                mpcAdvanceStartWallNs_.store(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(startWall.time_since_epoch()).count(),
+                    std::memory_order_relaxed);
                 mpcMrtInterface_->advanceMpc();
+                const auto endWall = std::chrono::steady_clock::now();
+                mpcAdvanceEndWallNs_.store(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(endWall.time_since_epoch()).count(),
+                    std::memory_order_relaxed);
                 mpcTimer_.endTimer();
+                ++advanceCounter;
+                mpcAdvanceCounter_.store(static_cast<std::uint64_t>(advanceCounter), std::memory_order_relaxed);
+
+                const auto now = std::chrono::steady_clock::now();
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastHeartbeat).count() >= 1000) {
+                  lastHeartbeat = now;
+                  RCLCPP_INFO_STREAM(controllerNh_->get_logger(),
+                                     "[MpcThread] advanceMpc_ok count=" << advanceCounter
+                                                                    << " now=" << controllerNh_->now().seconds());
+                }
               }
             },
             HumanoidInterface_->mpcSettings().mpcDesiredFrequency_);
@@ -621,6 +832,12 @@ void humanoidController::setupStateEstimate(const std::string& taskFile, bool ve
 void humanoidCheaterController::setupStateEstimate(const std::string& /*taskFile*/, bool /*verbose*/) {
   stateEstimate_ = std::make_shared<FromTopicStateEstimate>(HumanoidInterface_->getPinocchioInterface(),
                                                             HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
+
+  // In MuJoCo cheat-control, joint-space PD alone cannot stabilize the floating base.
+  // The generic MPC warm-up ramps WBC feedforward torque from 0 -> 100% over a few seconds,
+  // which causes the robot to tip before sufficient stabilizing torque is applied.
+  // Disable the warm-up so full WBC torque is available immediately after unpausing.
+  disableMpcWarmup();
 }
 
 }  // namespace humanoid_controller

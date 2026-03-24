@@ -4,6 +4,7 @@
 
 #include "humanoid_controllers/humanoidController.h"
 #include <atomic>
+#include <rclcpp/qos.hpp>
 #include <thread>
 
 using Duration = std::chrono::duration<double>;
@@ -13,7 +14,6 @@ std::atomic_bool pause_flag{true};
 
 void pauseCallback(const std_msgs::msg::Bool::ConstSharedPtr& msg){
     pause_flag.store(msg->data, std::memory_order_relaxed);
-    std::cerr << "pause_flag: " << pause_flag.load(std::memory_order_relaxed) << std::endl;
 }
 
 int main(int argc, char** argv){
@@ -25,7 +25,8 @@ int main(int argc, char** argv){
     
     //create a subscriber to pauseFlag
     auto pause_sub = nh->create_subscription<std_msgs::msg::Bool>("pauseFlag", 1, pauseCallback);
-    auto controller_ready_pub = nh->create_publisher<std_msgs::msg::Bool>("controllerReady", 1);
+    auto controller_ready_pub = nh->create_publisher<std_msgs::msg::Bool>(
+        "controllerReady", rclcpp::QoS(1).transient_local().reliable());
     std_msgs::msg::Bool controller_ready_msg;
     controller_ready_msg.data = false;
     controller_ready_pub->publish(controller_ready_msg);

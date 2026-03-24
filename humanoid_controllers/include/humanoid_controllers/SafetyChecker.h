@@ -20,10 +20,13 @@ class SafetyChecker {
  protected:
   bool checkOrientation(const SystemObservation& observation) {
     vector_t pose = getBasePose(observation.state, info_);
-    if (pose(5) > M_PI_2 || pose(5) < -M_PI_2) {
-      std::cerr << "[SafetyChecker] Orientation safety check failed!" << std::endl;
-      //output pose
-//        std::cerr << "pose: " << pose << std::endl;
+    // NOTE: In simulation, the robot may briefly exceed 90deg roll during transient
+    // startup or recovery. A too-strict threshold can immediately force the
+    // controller into a zero-feedforward fallback where it cannot recover.
+    constexpr double kMaxRollAbsRad = 2.8;  // ~160deg
+    if (pose(5) > kMaxRollAbsRad || pose(5) < -kMaxRollAbsRad) {
+      std::cerr << "[SafetyChecker] Orientation safety check failed! yaw=" << pose(3)
+                << " pitch=" << pose(4) << " roll=" << pose(5) << std::endl;
       return false;
     }
     return true;

@@ -20,6 +20,7 @@ scalar_t COM_HEIGHT;
 vector_t DEFAULT_JOINT_STATE(12);
 scalar_t TIME_TO_TARGET;
 constexpr scalar_t CMD_VEL_TIME_TO_TARGET_LIMIT = 0.6;
+bool SWAP_CMD_VEL_XY = false;
 }  // namespace
 
 scalar_t estimateTimeToTarget(const vector_t& desiredBaseDisplacement) {
@@ -68,9 +69,13 @@ TargetTrajectories goalToTargetTrajectories(const vector_t& goal, const SystemOb
 }
 
 TargetTrajectories cmdVelToTargetTrajectories(const vector_t& cmdVel, const SystemObservation& observation) {
-    const vector_t currentPose = observation.state.segment<6>(6);
+  const vector_t currentPose = observation.state.segment<6>(6);
   const Eigen::Matrix<scalar_t, 3, 1> zyx = currentPose.tail(3);
-  vector_t cmdVelRot = getRotationMatrixFromZyxEulerAngles(zyx) * cmdVel.head(3);
+  vector_t cmdVelBase = cmdVel.head(3);
+  if (SWAP_CMD_VEL_XY) {
+    std::swap(cmdVelBase(0), cmdVelBase(1));
+  }
+  vector_t cmdVelRot = getRotationMatrixFromZyxEulerAngles(zyx) * cmdVelBase;
 
   const scalar_t timeToTarget = std::min(TIME_TO_TARGET, CMD_VEL_TIME_TO_TARGET_LIMIT);
     
@@ -107,6 +112,8 @@ int main(int argc, char** argv) {
   nodeHandle->get_parameter("referenceFile", referenceFile);
   nodeHandle->declare_parameter<std::string>("taskFile", "");
   nodeHandle->get_parameter("taskFile", taskFile);
+  nodeHandle->declare_parameter<bool>("swap_cmd_vel_xy", false);
+  nodeHandle->get_parameter("swap_cmd_vel_xy", SWAP_CMD_VEL_XY);
 
   loadData::loadCppDataType(referenceFile, "comHeight", COM_HEIGHT);
   loadData::loadEigenMatrix(referenceFile, "defaultJointState", DEFAULT_JOINT_STATE);

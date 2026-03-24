@@ -13,6 +13,8 @@
 #include <mutex>
 
 #include <ocs2_mpc/SystemObservation.h>
+#include <ocs2_msgs/msg/mpc_observation.hpp>
+#include <ocs2_ros_interfaces/common/RosMsgConversions.h>
 #include <ocs2_ros_interfaces/command/TargetTrajectoriesRosPublisher.h>
 
 #include <humanoid_interface/gait/MotionPhaseDefinition.h>
@@ -42,9 +44,16 @@ class TargetTrajectoriesPublisher final {
     };
     observationSub_ = nh->create_subscription<ocs2_msgs::msg::MpcObservation>(topicPrefix + "_mpc_observation", 1, observationCallback);
 
+    auto warnMissingObservation = [nh]() {
+      RCLCPP_WARN_THROTTLE(nh->get_logger(), *nh->get_clock(), 2000,
+                           "Ignoring command because no '%s_mpc_observation' has been received yet.",
+                           "humanoid");
+    };
+
     // goal subscriber
-    auto goalCallback = [this](const geometry_msgs::msg::PoseStamped::ConstSharedPtr& msg) {
+    auto goalCallback = [this, nh, warnMissingObservation](const geometry_msgs::msg::PoseStamped::ConstSharedPtr& msg) {
       if (latestObservation_.time == 0.0) {
+        warnMissingObservation();
         return;
       }
       geometry_msgs::msg::PoseStamped pose = *msg;
@@ -65,12 +74,17 @@ class TargetTrajectoriesPublisher final {
       cmdGoal[5] = q.toRotationMatrix().eulerAngles(0, 1, 2).x();
 
       const auto trajectories = goalToTargetTrajectories_(cmdGoal, latestObservation_);
+      const auto& targetState = trajectories.stateTrajectory.back();
+      const auto targetPose = targetState.segment<6>(6);
+      RCLCPP_INFO(nh->get_logger(), "Published goal target: x=%.3f y=%.3f z=%.3f yaw=%.3f",
+                  targetPose[0], targetPose[1], targetPose[2], targetPose[3]);
       targetTrajectoriesPublisher_->publishTargetTrajectories(trajectories);
     };
 
     // cmd_vel subscriber
-    auto cmdVelCallback = [this](const geometry_msgs::msg::Twist::ConstSharedPtr& msg) {
+    auto cmdVelCallback = [this, nh, warnMissingObservation](const geometry_msgs::msg::Twist::ConstSharedPtr& msg) {
       if (latestObservation_.time == 0.0) {
+        warnMissingObservation();
         return;
       }
 
@@ -81,10 +95,15 @@ class TargetTrajectoriesPublisher final {
       cmdVel[3] = msg->angular.z;
 
       const auto trajectories = cmdVelToTargetTrajectories_(cmdVel, latestObservation_);
+      const auto& targetState = trajectories.stateTrajectory.back();
+      const auto targetPose = targetState.segment<6>(6);
+      RCLCPP_INFO(nh->get_logger(), "Published cmd_vel target: x=%.3f y=%.3f z=%.3f yaw=%.3f",
+                  targetPose[0], targetPose[1], targetPose[2], targetPose[3]);
       targetTrajectoriesPublisher_->publishTargetTrajectories(trajectories);
     };
 
     goalSub_ = nh->create_subscription<geometry_msgs::msg::PoseStamped>("/move_base_simple/goal", 1, goalCallback);
+    goalPoseSub_ = nh->create_subscription<geometry_msgs::msg::PoseStamped>("/goal_pose", 1, goalCallback);
     cmdVelSub_ = nh->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel", 1, cmdVelCallback);
   }
 
@@ -95,6 +114,7 @@ class TargetTrajectoriesPublisher final {
 
   rclcpp::Subscription<ocs2_msgs::msg::MpcObservation>::SharedPtr observationSub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goalSub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goalPoseSub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub_;
   tf2_ros::Buffer buffer_;
   tf2_ros::TransformListener tf2_;

@@ -22,6 +22,8 @@ set(AMENT_PACKAGE_DEPENDENCIES
   angles
 )
 
+find_package(pinocchio REQUIRED CONFIG)
+
 find_package(ament_cmake REQUIRED)
 foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
   find_package(${dep} REQUIRED)
@@ -34,23 +36,15 @@ find_package(Boost REQUIRED COMPONENTS
   log_setup
 )
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(pinocchio REQUIRED pinocchio)
-
 include_directories(
   include
-  ${pinocchio_INCLUDE_DIRS}
-)
-
-link_directories(
-  ${pinocchio_LIBRARY_DIRS}
 )
 
 add_library(${PROJECT_NAME} SHARED
   src/humanoidController.cpp
 )
 target_link_libraries(${PROJECT_NAME}
-  ${pinocchio_LIBRARIES}
+  pinocchio::pinocchio
 )
 ament_target_dependencies(${PROJECT_NAME} ${AMENT_PACKAGE_DEPENDENCIES})
 

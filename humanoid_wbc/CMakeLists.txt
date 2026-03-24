@@ -8,21 +8,14 @@ find_package(Boost REQUIRED COMPONENTS
   log
   log_setup
 )
+find_package(pinocchio REQUIRED CONFIG)
 find_package(humanoid_interface REQUIRED)
 find_package(qpoases_catkin REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(pinocchio REQUIRED pinocchio)
-
 include_directories(
         include
         ${EIGEN3_INCLUDE_DIRS}
-        ${pinocchio_INCLUDE_DIRS}
-)
-
-link_directories(
-        ${pinocchio_LIBRARY_DIRS}
 )
 
 add_library(${PROJECT_NAME} SHARED
@@ -33,7 +26,7 @@ add_library(${PROJECT_NAME} SHARED
         )
 
 target_link_libraries(${PROJECT_NAME}
-        ${pinocchio_LIBRARIES}
+        pinocchio::pinocchio
         ${qpoases_catkin_LIBRARIES}
         )
 target_include_directories(${PROJECT_NAME} PUBLIC ${qpoases_catkin_INCLUDE_DIRS})

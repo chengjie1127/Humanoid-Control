@@ -30,6 +30,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Pinocchio forward declarations must be included first
 #include <pinocchio/fwd.hpp>
 
+#include <algorithm>
+
 // Pinocchio
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
@@ -40,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_centroidal_model/AccessHelperFunctions.h>
 #include <ocs2_core/misc/LinearInterpolation.h>
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
+#include <ocs2_ros_interfaces/common/RosMsgConversions.h>
 #include <ocs2_ros_interfaces/visualization/VisualizationHelpers.h>
 #include "humanoid_interface/gait/MotionPhaseDefinition.h"
 
@@ -47,6 +50,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace ocs2 {
 namespace humanoid {
+
+namespace {
+constexpr scalar_t kVisualizationPreviewTime = 0.05;
+
+size_t getPreviewStateIndex(const scalar_array_t& timeTrajectory, scalar_t currentTime) {
+  for (size_t i = 0; i < timeTrajectory.size(); ++i) {
+    if (timeTrajectory[i] >= currentTime + kVisualizationPreviewTime) {
+      return i;
+    }
+  }
+  return timeTrajectory.empty() ? 0 : timeTrajectory.size() - 1;
+}
+}  // namespace
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -67,17 +83,19 @@ HumanoidVisualizer::HumanoidVisualizer(PinocchioInterface pinocchioInterface, Ce
 /******************************************************************************************************/
 /******************************************************************************************************/
 void HumanoidVisualizer::launchVisualizerNode(std::shared_ptr<rclcpp::Node> node) {
+  const std::string robotName = "humanoid";
   node_ = node;
   costDesiredBasePositionPublisher_ = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredBaseTrajectory", 1);
   costDesiredFeetPositionPublishers_.resize(centroidalModelInfo_.numThreeDofContacts);
   costDesiredFeetPositionPublishers_[0] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/LTOE", 1);
-  costDesiredFeetPositionPublishers_[1] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/LHEEL", 1);
-  costDesiredFeetPositionPublishers_[2] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/RTOE", 1);
+  costDesiredFeetPositionPublishers_[1] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/RTOE", 1);
+  costDesiredFeetPositionPublishers_[2] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/LHEEL", 1);
   costDesiredFeetPositionPublishers_[3] = node_->create_publisher<visualization_msgs::msg::Marker>("/humanoid/desiredFeetTrajectory/RHEEL", 1);
   stateOptimizedPublisher_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/optimizedStateTrajectory", 1);
   currentStatePublisher_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/currentState", 1);
 
   jointStatePublisher_ = node_->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 1);
+  observationPublisher_ = node_->create_publisher<ocs2_msgs::msg::MpcObservation>(robotName + "_mpc_observation", 1);
   tfBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(node_);
 }
 
@@ -86,13 +104,32 @@ void HumanoidVisualizer::launchVisualizerNode(std::shared_ptr<rclcpp::Node> node
 /******************************************************************************************************/
 void HumanoidVisualizer::update(const SystemObservation& observation, const PrimalSolution& primalSolution, const CommandData& command) {
   if (observation.time - lastTime_ > minPublishTimeDifference_) {
+    SystemObservation displayObservation = observation;
+    if (!primalSolution.stateTrajectory_.empty()) {
+      size_t displayIndex = 0;
+      if (!primalSolution.timeTrajectory_.empty()) {
+        displayIndex = getPreviewStateIndex(primalSolution.timeTrajectory_, observation.time);
+      }
+      displayObservation.state = primalSolution.stateTrajectory_[displayIndex];
+      if (!primalSolution.inputTrajectory_.empty()) {
+        const size_t inputIndex = std::min(displayIndex, primalSolution.inputTrajectory_.size() - 1);
+        displayObservation.input = primalSolution.inputTrajectory_[inputIndex];
+      }
+      if (!primalSolution.timeTrajectory_.empty()) {
+        displayObservation.mode = primalSolution.modeSchedule_.modeAtTime(primalSolution.timeTrajectory_[displayIndex]);
+      }
+    }
+
     const auto& model = pinocchioInterface_.getModel();
     auto& data = pinocchioInterface_.getData();
-    pinocchio::forwardKinematics(model, data, centroidal_model::getGeneralizedCoordinates(observation.state, centroidalModelInfo_));
+    pinocchio::forwardKinematics(model, data, centroidal_model::getGeneralizedCoordinates(displayObservation.state, centroidalModelInfo_));
     pinocchio::updateFramePlacements(model, data);
 
     const auto timeStamp = node_->now();
-    publishObservation(timeStamp, observation);
+    publishObservation(timeStamp, displayObservation, false);
+    if (observationPublisher_ != nullptr) {
+      observationPublisher_->publish(ros_msg_conversions::createObservationMsg(observation));
+    }
     publishDesiredTrajectory(timeStamp, command.mpcTargetTrajectories_);
     publishOptimizedStateTrajectory(timeStamp, primalSolution.timeTrajectory_, primalSolution.stateTrajectory_,
                                     primalSolution.modeSchedule_);
@@ -103,7 +140,7 @@ void HumanoidVisualizer::update(const SystemObservation& observation, const Prim
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void HumanoidVisualizer::publishObservation(rclcpp::Time timeStamp, const SystemObservation& observation) {
+void HumanoidVisualizer::publishObservation(rclcpp::Time timeStamp, const SystemObservation& observation, bool publishObservationMsg) {
   // Extract components from state
   const auto basePose = centroidal_model::getBasePose(observation.state, centroidalModelInfo_);
   const auto qJoints = centroidal_model::getJointAngles(observation.state, centroidalModelInfo_);
@@ -119,6 +156,9 @@ void HumanoidVisualizer::publishObservation(rclcpp::Time timeStamp, const System
   publishJointTransforms(timeStamp, qJoints);
   publishBaseTransform(timeStamp, basePose);
   publishCartesianMarkers(timeStamp, modeNumber2StanceLeg(observation.mode), feetPositions, feetForces);
+  if (publishObservationMsg && observationPublisher_ != nullptr) {
+    observationPublisher_->publish(ros_msg_conversions::createObservationMsg(observation));
+  }
 }
 
 /******************************************************************************************************/
@@ -131,8 +171,10 @@ void HumanoidVisualizer::publishJointTransforms(rclcpp::Time timeStamp, const ve
     jointMsg.name = {"left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint", "left_knee_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
                      "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint", "right_knee_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint"};
     jointMsg.position.resize(12);
+    const auto lowerLimits = pinocchioInterface_.getModel().lowerPositionLimit.tail(12);
+    const auto upperLimits = pinocchioInterface_.getModel().upperPositionLimit.tail(12);
     for (size_t i = 0; i < 12; ++i) {
-      jointMsg.position[i] = jointAngles[i];
+      jointMsg.position[i] = std::clamp(jointAngles[i], lowerLimits[static_cast<Eigen::Index>(i)], upperLimits[static_cast<Eigen::Index>(i)]);
     }
     jointStatePublisher_->publish(jointMsg);
   }

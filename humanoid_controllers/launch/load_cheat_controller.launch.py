@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, ExecuteProcess
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -44,7 +45,7 @@ def find_ocs2_setup():
     return candidate if os.path.exists(candidate) else ''
 
 
-def create_gait_terminal_action():
+def create_gait_terminal_action(condition=None):
     gnome_terminal_real = '/usr/bin/gnome-terminal.real'
     setup_path = find_workspace_setup()
     ocs2_setup_path = find_ocs2_setup()
@@ -93,12 +94,14 @@ def create_gait_terminal_action():
             ],
         ],
         output='screen',
+        condition=condition,
     )
 
 
 def generate_launch_description():
     launch_actions = [
         DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('open_gait_terminal', default_value='false'),
         DeclareLaunchArgument('taskFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/mpc/task.info'])),
         DeclareLaunchArgument('referenceFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/reference.info'])),
         DeclareLaunchArgument('urdfFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_control.urdf'])),
@@ -119,7 +122,7 @@ def generate_launch_description():
         ),
     ]
 
-    gait_terminal_action = create_gait_terminal_action()
+    gait_terminal_action = create_gait_terminal_action(condition=IfCondition(LaunchConfiguration('open_gait_terminal')))
     if gait_terminal_action is not None:
         launch_actions.append(gait_terminal_action)
 
@@ -159,7 +162,13 @@ def generate_launch_description():
             executable='humanoid_sim.py',
             name='humanoid_sim',
             output='screen',
-            additional_env={'FASTDDS_BUILTIN_TRANSPORTS': 'UDPv4'},
+            additional_env={
+                'FASTDDS_BUILTIN_TRANSPORTS': 'UDPv4',
+                # Prevent GLFW/OpenGL initialization hangs in headless/remote sessions.
+                'MUJOCO_GL': 'egl',
+                # Ensure simulator prints show up immediately in launch logs.
+                'PYTHONUNBUFFERED': '1',
+            },
             parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
         Node(

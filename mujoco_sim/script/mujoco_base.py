@@ -17,7 +17,10 @@ class MuJoCoBase():
         self.pause_flag = True
         self.controller_ready = False
         self.controller_ready_time = None
-        self.ready_hold_duration = 2.0
+        # Keep this short: while the sim is paused, the controller's MPC thread may continue
+        # advancing on stale observations, which can lead to an immediate destabilizing torque
+        # burst when the sim finally unpauses.
+        self.ready_hold_duration = 0.1
         self.pending_unpause_request = False
         self.startup_auto_unpause_pending = True
         self.space_pressed = False
