@@ -77,7 +77,7 @@ void HumanoidVisualizer::launchVisualizerNode(std::shared_ptr<rclcpp::Node> node
   stateOptimizedPublisher_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/optimizedStateTrajectory", 1);
   currentStatePublisher_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>("/humanoid/currentState", 1);
 
-  jointStatePublisher_ = node_->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 1);
+  jointStatePublisher_ = node_->create_publisher<sensor_msgs::msg::JointState>("joint_states", 1);
   tfBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(node_);
 }
 

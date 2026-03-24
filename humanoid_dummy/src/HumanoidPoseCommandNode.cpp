@@ -29,11 +29,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
 
+#include <atomic>
+#include <mutex>
+
+#include <unistd.h>
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <ocs2_core/Types.h>
 #include <ocs2_core/misc/LoadData.h>
+#include <ocs2_ros_interfaces/command/TargetTrajectoriesRosPublisher.h>
+#include <ocs2_ros_interfaces/common/RosMsgConversions.h>
 #include <ocs2_ros_interfaces/command/TargetTrajectoriesKeyboardPublisher.h>
+
+#include <ocs2_msgs/msg/mpc_observation.hpp>
 
 using namespace ocs2;
 
@@ -109,14 +118,72 @@ int main(int argc, char* argv[]) {
   loadData::loadCppDataType(referenceFile, "targetRotationVelocity", targetRotationVelocity);
   loadData::loadCppDataType(referenceFile, "targetDisplacementVelocity", targetDisplacementVelocity);
 
-  // goalPose: [deltaX, deltaY, deltaZ, deltaYaw]
-  const scalar_array_t relativeBaseLimit{10.0, 10.0, 0.2, 360.0};
-  TargetTrajectoriesKeyboardPublisher targetPoseCommand(nodeHandle, robotName, relativeBaseLimit, &commandLineToTargetTrajectories);
+  const bool stdinIsTty = ::isatty(STDIN_FILENO);
 
-  const std::string commandMsg = "Enter XYZ and Yaw (deg) displacements for the TORSO, separated by spaces";
-  targetPoseCommand.publishKeyboardCommand(commandMsg);
+  if (stdinIsTty) {
+    // Interactive mode (original behavior)
+    // goalPose: [deltaX, deltaY, deltaZ, deltaYaw]
+    const scalar_array_t relativeBaseLimit{10.0, 10.0, 0.2, 360.0};
+    TargetTrajectoriesKeyboardPublisher targetPoseCommand(nodeHandle, robotName, relativeBaseLimit, &commandLineToTargetTrajectories);
 
-  // Successful exit
+    const std::string commandMsg = "Enter XYZ and Yaw (deg) displacements for the TORSO, separated by spaces";
+    targetPoseCommand.publishKeyboardCommand(commandMsg);
+
+    // Successful exit
+    rclcpp::shutdown();
+    return 0;
+  }
+
+  // Headless mode: publish an initial standing target once an observation is available.
+  // This breaks the MPC/MRT startup deadlock in non-interactive environments.
+  nodeHandle->declare_parameter<bool>("autoPublishInitialTarget", true);
+  bool autoPublishInitialTarget = true;
+  nodeHandle->get_parameter("autoPublishInitialTarget", autoPublishInitialTarget);
+
+  std::mutex latestObservationMutex;
+  SystemObservation latestObservation;
+  std::atomic<bool> haveObservation{false};
+  std::atomic<bool> publishedInitialTarget{false};
+
+  TargetTrajectoriesRosPublisher targetPublisher(nodeHandle, robotName);
+
+  auto observationCallback = [&](const ocs2_msgs::msg::MpcObservation::ConstSharedPtr& msg) {
+    std::lock_guard<std::mutex> lock(latestObservationMutex);
+    latestObservation = ros_msg_conversions::readObservationMsg(*msg);
+    haveObservation.store(true, std::memory_order_relaxed);
+  };
+  auto observationSub = nodeHandle->create_subscription<ocs2_msgs::msg::MpcObservation>(
+      robotName + "_mpc_observation", rclcpp::QoS(1), observationCallback);
+
+  auto timer = nodeHandle->create_wall_timer(std::chrono::milliseconds(100), [&]() {
+    if (!autoPublishInitialTarget) {
+      return;
+    }
+    if (publishedInitialTarget.load(std::memory_order_relaxed)) {
+      return;
+    }
+    if (!haveObservation.load(std::memory_order_relaxed)) {
+      return;
+    }
+
+    SystemObservation obsCopy;
+    {
+      std::lock_guard<std::mutex> lock(latestObservationMutex);
+      obsCopy = latestObservation;
+    }
+
+    const vector_t zeroCmd = vector_t::Zero(4);  // [dX, dY, dZ, dYawDeg]
+    const auto trajectories = commandLineToTargetTrajectories(zeroCmd, obsCopy);
+    targetPublisher.publishTargetTrajectories(trajectories);
+    publishedInitialTarget.store(true, std::memory_order_relaxed);
+    RCLCPP_INFO(nodeHandle->get_logger(), "Published initial target trajectories (headless mode).\n");
+  });
+
+  RCLCPP_INFO(nodeHandle->get_logger(),
+              "No TTY detected; running in headless mode. Waiting for %s and auto-publishing an initial %s if enabled.",
+              (robotName + "_mpc_observation").c_str(), (robotName + "_mpc_target").c_str());
+
+  rclcpp::spin(nodeHandle);
   rclcpp::shutdown();
   return 0;
 }

@@ -8,6 +8,10 @@ def generate_launch_description():
     urdf = os.path.join(
         get_package_share_directory('humanoid_legged_description'),
         urdf_file_name)
+    rviz_config = os.path.join(
+        get_package_share_directory('humanoid_legged_description'),
+        'config',
+        'urdf.rviz')
     with open(urdf, 'r') as infp:
         robot_desc = infp.read()
 
@@ -25,6 +29,6 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments=['-d', os.path.join(get_package_share_directory('humanoid_legged_description'), 'urdf.rviz')]
+            arguments=['-d', rviz_config]
         ),
     ])

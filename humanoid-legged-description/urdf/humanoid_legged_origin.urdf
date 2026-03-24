@@ -32,6 +32,24 @@
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>
 
+  <!-- Pelvis contour (visual only) -->
+  <link name="pelvis_contour_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/pelvis_contour_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="pelvis_contour_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="pelvis"/>
+    <child link="pelvis_contour_link"/>
+  </joint>
+
   <!-- ============== LEFT LEG ============== -->
   <link name="left_hip_pitch_link">
     <inertial>
@@ -369,6 +387,15 @@
       <mass value="0.244"/>
       <inertia ixx="0.000158561" ixy="0" ixz="0" iyy="0.000124229" iyz="0" izz="9.67669e-05"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/waist_yaw_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="waist_yaw_joint" type="fixed">
     <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -382,6 +409,15 @@
       <mass value="0.047"/>
       <inertia ixx="7.515e-06" ixy="0" ixz="0" iyy="6.40206e-06" iyz="0" izz="3.98394e-06"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/waist_roll_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="waist_roll_joint" type="fixed">
     <origin xyz="-0.0039635 0 0.035" rpy="0 0 0"/>
@@ -417,6 +453,41 @@
     <child link="torso_link"/>
   </joint>
 
+  <!-- Extra torso visuals (visual only) -->
+  <link name="logo_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/logo_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="logo_joint" type="fixed">
+    <origin xyz="0.0039635 0 -0.054" rpy="0 0 0"/>
+    <parent link="torso_link"/>
+    <child link="logo_link"/>
+  </joint>
+
+  <link name="waist_support_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/waist_support_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="waist_support_joint" type="fixed">
+    <origin xyz="0.0039635 0 -0.054" rpy="0 0 0"/>
+    <parent link="torso_link"/>
+    <child link="waist_support_link"/>
+  </joint>
+
   <link name="head_link">
     <inertial>
       <origin xyz="0 0 0.08" rpy="0 0 0"/>
@@ -434,7 +505,7 @@
     </visual>
   </link>
   <joint name="head_joint" type="fixed">
-    <origin xyz="0.0039635 0 0.30" rpy="0 0 0"/>
+    <origin xyz="0.0039635 0 -0.054" rpy="0 0 0"/>
     <parent link="torso_link"/>
     <child link="head_link"/>
   </joint>
@@ -446,6 +517,15 @@
       <mass value="0.718"/>
       <inertia ixx="0.000465864" ixy="0" ixz="0" iyy="0.000432842" iyz="0" izz="0.000406394"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_shoulder_pitch_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="left_shoulder_pitch_joint" type="fixed">
     <origin xyz="0.0039563 0.10022 0.23778" rpy="0 -0.2787 0"/>
@@ -459,6 +539,15 @@
       <mass value="0.643"/>
       <inertia ixx="0.000691311" ixy="0" ixz="0" iyy="0.000618011" iyz="0" izz="0.000388977"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_shoulder_roll_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="left_shoulder_roll_joint" type="fixed">
     <origin xyz="0 0.038 -0.013831" rpy="0 0 0"/>
@@ -472,6 +561,15 @@
       <mass value="0.734"/>
       <inertia ixx="0.00106187" ixy="0" ixz="0" iyy="0.00103217" iyz="0" izz="0.000400661"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_shoulder_yaw_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="left_shoulder_yaw_joint" type="fixed">
     <origin xyz="0 0.00624 -0.1032" rpy="0 0 0"/>
@@ -485,11 +583,72 @@
       <mass value="0.6"/>
       <inertia ixx="0.000443035" ixy="0" ixz="0" iyy="0.000421612" iyz="0" izz="0.000259353"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_elbow_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="left_elbow_joint" type="fixed">
     <origin xyz="0.015783 0 -0.080518" rpy="0 0 0"/>
     <parent link="left_shoulder_yaw_link"/>
     <child link="left_elbow_link"/>
+  </joint>
+
+  <!-- Left wrist (visual only, fixed) -->
+  <link name="left_wrist_roll_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_wrist_roll_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="left_wrist_roll_joint" type="fixed">
+    <origin xyz="0.1 0.00188791 -0.01" rpy="0 0 0"/>
+    <parent link="left_elbow_link"/>
+    <child link="left_wrist_roll_link"/>
+  </joint>
+
+  <link name="left_wrist_pitch_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_wrist_pitch_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="left_wrist_pitch_joint" type="fixed">
+    <origin xyz="0.038 0 0" rpy="0 0 0"/>
+    <parent link="left_wrist_roll_link"/>
+    <child link="left_wrist_pitch_link"/>
+  </joint>
+
+  <link name="left_wrist_yaw_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_wrist_yaw_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="left_wrist_yaw_joint" type="fixed">
+    <origin xyz="0.046 0 0" rpy="0 0 0"/>
+    <parent link="left_wrist_pitch_link"/>
+    <child link="left_wrist_yaw_link"/>
   </joint>
 
   <link name="left_rubber_hand">
@@ -498,10 +657,19 @@
       <mass value="0.824"/>
       <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.0005"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/left_rubber_hand.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="left_hand_joint" type="fixed">
-    <origin xyz="0.1 0.00188791 -0.01" rpy="0 0 0"/>
-    <parent link="left_elbow_link"/>
+    <origin xyz="0.0415 0.003 0" rpy="0 0 0"/>
+    <parent link="left_wrist_yaw_link"/>
     <child link="left_rubber_hand"/>
   </joint>
 
@@ -512,6 +680,15 @@
       <mass value="0.718"/>
       <inertia ixx="0.000465864" ixy="0" ixz="0" iyy="0.000432842" iyz="0" izz="0.000406394"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_shoulder_pitch_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="right_shoulder_pitch_joint" type="fixed">
     <origin xyz="0.0039563 -0.10021 0.23778" rpy="0 -0.2787 0"/>
@@ -525,6 +702,15 @@
       <mass value="0.643"/>
       <inertia ixx="0.000691311" ixy="0" ixz="0" iyy="0.000618011" iyz="0" izz="0.000388977"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_shoulder_roll_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="right_shoulder_roll_joint" type="fixed">
     <origin xyz="0 -0.038 -0.013831" rpy="0 0 0"/>
@@ -538,6 +724,15 @@
       <mass value="0.734"/>
       <inertia ixx="0.00106187" ixy="0" ixz="0" iyy="0.00103217" iyz="0" izz="0.000400661"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_shoulder_yaw_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="right_shoulder_yaw_joint" type="fixed">
     <origin xyz="0 -0.00624 -0.1032" rpy="0 0 0"/>
@@ -551,11 +746,72 @@
       <mass value="0.6"/>
       <inertia ixx="0.000443035" ixy="0" ixz="0" iyy="0.000421612" iyz="0" izz="0.000259353"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_elbow_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="right_elbow_joint" type="fixed">
     <origin xyz="0.015783 0 -0.080518" rpy="0 0 0"/>
     <parent link="right_shoulder_yaw_link"/>
     <child link="right_elbow_link"/>
+  </joint>
+
+  <!-- Right wrist (visual only, fixed) -->
+  <link name="right_wrist_roll_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_wrist_roll_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="right_wrist_roll_joint" type="fixed">
+    <origin xyz="0.1 -0.00188791 -0.01" rpy="0 0 0"/>
+    <parent link="right_elbow_link"/>
+    <child link="right_wrist_roll_link"/>
+  </joint>
+
+  <link name="right_wrist_pitch_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_wrist_pitch_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="right_wrist_pitch_joint" type="fixed">
+    <origin xyz="0.038 0 0" rpy="0 0 0"/>
+    <parent link="right_wrist_roll_link"/>
+    <child link="right_wrist_pitch_link"/>
+  </joint>
+
+  <link name="right_wrist_yaw_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_wrist_yaw_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.7 0.7 0.7 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="right_wrist_yaw_joint" type="fixed">
+    <origin xyz="0.046 0 0" rpy="0 0 0"/>
+    <parent link="right_wrist_pitch_link"/>
+    <child link="right_wrist_yaw_link"/>
   </joint>
 
   <link name="right_rubber_hand">
@@ -564,10 +820,19 @@
       <mass value="0.824"/>
       <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.0005"/>
     </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://humanoid_legged_description/meshes/right_rubber_hand.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
   </link>
   <joint name="right_hand_joint" type="fixed">
-    <origin xyz="0.1 -0.00188791 -0.01" rpy="0 0 0"/>
-    <parent link="right_elbow_link"/>
+    <origin xyz="0.0415 -0.003 0" rpy="0 0 0"/>
+    <parent link="right_wrist_yaw_link"/>
     <child link="right_rubber_hand"/>
   </joint>
 

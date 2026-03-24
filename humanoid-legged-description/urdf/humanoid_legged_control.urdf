@@ -299,7 +299,7 @@
     </inertial>
   </link>
   <joint name="head_joint" type="fixed">
-    <origin xyz="0.0039635 0 0.30" rpy="0 0 0"/>
+    <origin xyz="0.0039635 0 -0.054" rpy="0 0 0"/>
     <parent link="torso_link"/>
     <child link="head_link"/>
   </joint>
