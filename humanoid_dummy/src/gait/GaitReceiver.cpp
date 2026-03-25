@@ -51,7 +51,7 @@ void GaitReceiver::preSolverRun(scalar_t initTime, scalar_t finalTime, const vec
   if (gaitUpdated_) {
     std::lock_guard<std::mutex> lock(receivedGaitMutex_);
     const auto timeHorizon = finalTime - initTime;
-    gaitSchedulePtr_->insertModeSequenceTemplate(receivedGait_, finalTime, timeHorizon);
+    gaitSchedulePtr_->insertModeSequenceTemplate(receivedGait_, finalTime, finalTime + timeHorizon);
     gaitUpdated_ = false;
   }
 }

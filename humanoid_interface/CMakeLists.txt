@@ -107,6 +107,7 @@ add_library(${PROJECT_NAME} SHARED
   src/constraint/NormalVelocityConstraintCppAd.cpp
   src/constraint/ZeroVelocityConstraintCppAd.cpp
   src/constraint/FootRollContraint.cpp
+  src/constraint/FootSafetyConstraint.cpp
   src/initialization/HumanoidInitializer.cpp
   src/reference_manager/SwitchedModelReferenceManager.cpp
   src/foot_planner/CubicSpline.cpp

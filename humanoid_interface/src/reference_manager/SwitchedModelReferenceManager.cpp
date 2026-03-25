@@ -64,7 +64,7 @@ void SwitchedModelReferenceManager::modifyReferences(scalar_t initTime, scalar_t
   const auto timeHorizon = finalTime - initTime;
   modeSchedule = gaitSchedulePtr_->getModeSchedule(initTime - timeHorizon, finalTime + timeHorizon);
 
-  const scalar_t terrainHeight = 0.02;
+  const scalar_t terrainHeight = 0.005;
   swingTrajectoryPtr_->update(modeSchedule, terrainHeight);
 }
 

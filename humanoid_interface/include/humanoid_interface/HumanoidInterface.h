@@ -111,8 +111,10 @@ class HumanoidInterface final : public RobotInterface {
   std::unique_ptr<StateInputConstraint> getNormalVelocityConstraint(const EndEffectorKinematics<scalar_t>& eeKinematics,
                                                                     size_t contactPointIndex, bool useAnalyticalGradients);
   std::unique_ptr<StateInputConstraint> getFootRollConstraint(size_t contactPointIndex);
-    std::unique_ptr<StateCost> getSelfCollisionConstraint(const PinocchioInterface& pinocchioInterface, const std::string& taskFile,
-                                                          const std::string& prefix, bool verbose);
+  std::unique_ptr<StateConstraint> getFootSafetyConstraint(const PinocchioInterface& pinocchioInterface, const std::string& taskFile,
+                                                           bool verbose);
+  std::unique_ptr<StateConstraint> getSelfCollisionConstraint(const PinocchioInterface& pinocchioInterface, const std::string& taskFile,
+                                                              const std::string& prefix, bool verbose);
 
   ModelSettings modelSettings_;
   ddp::Settings ddpSettings_;
