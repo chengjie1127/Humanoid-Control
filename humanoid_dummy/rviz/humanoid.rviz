@@ -134,7 +134,9 @@ Visualization Manager:
           Show Trail: false
           Value: true
       Name: RobotModel
-      Robot Description: /robot_description
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -163,7 +165,7 @@ Visualization Manager:
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: base_link
+    Fixed Frame: odom
     Frame Rate: 30
   Name: root
   Tools:

@@ -17,7 +17,7 @@ def generate_launch_description():
             executable='humanoid_gait_command',
             name='humanoid_gait_command',
             output='screen',
-            prefix=['gnome-terminal', '--'],
+            prefix='gnome-terminal --',
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
@@ -67,6 +67,6 @@ def generate_launch_description():
             executable='teleop.py',
             name='teleop',
             output='screen',
-            prefix=['gnome-terminal', '--']
+            prefix='gnome-terminal --'
         )
     ])

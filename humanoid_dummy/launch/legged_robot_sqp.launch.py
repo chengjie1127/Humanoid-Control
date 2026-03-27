@@ -55,7 +55,6 @@ def generate_launch_description():
             executable='humanoid_dummy_node',
             name='humanoid_dummy_node',
             output='screen',
-            prefix=['gnome-terminal', '--'],
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
@@ -70,7 +69,7 @@ def generate_launch_description():
             executable='humanoid_target',
             name='humanoid_target',
             output='screen',
-            prefix=['gnome-terminal', '--'],
+            prefix='gnome-terminal --',
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
@@ -85,7 +84,7 @@ def generate_launch_description():
             executable='humanoid_gait_command',
             name='humanoid_gait_command',
             output='screen',
-            prefix=['gnome-terminal', '--'],
+            prefix='gnome-terminal --',
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
