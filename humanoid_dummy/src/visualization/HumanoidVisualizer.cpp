@@ -128,8 +128,9 @@ void HumanoidVisualizer::publishJointTransforms(rclcpp::Time timeStamp, const ve
   if (jointStatePublisher_ != nullptr) {
     sensor_msgs::msg::JointState jointMsg;
     jointMsg.header.stamp = timeStamp;
-    jointMsg.name = {"leg_l1_joint", "leg_l2_joint", "leg_l3_joint", "leg_l4_joint", "leg_l5_joint", "leg_l6_joint",
-                     "leg_r1_joint", "leg_r2_joint", "leg_r3_joint", "leg_r4_joint", "leg_r5_joint", "leg_r6_joint"};
+    jointMsg.name = {"left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint", "left_knee_joint",
+                     "left_ankle_pitch_joint", "left_ankle_roll_joint", "right_hip_pitch_joint", "right_hip_roll_joint",
+                     "right_hip_yaw_joint", "right_knee_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint"};
     jointMsg.position.resize(12);
     for (size_t i = 0; i < 12; ++i) {
       jointMsg.position[i] = jointAngles[i];
