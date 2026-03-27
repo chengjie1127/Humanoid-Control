@@ -12,8 +12,10 @@ from sensor_msgs.msg import Imu
 import time
 from scipy.spatial.transform import Rotation as R
 
-init_joint_pos = np.array([0.0, 0.0, 0.37, 0.90, 0.53, 0.0, 0.0, 0.0, 0.37, 0.90, 0.53, 0.0])
-init_base_pos = np.array([0.0, 0.0, 1.225])
+# init_joint_pos = np.array([0.0, 0.0, 0.37, 0.90, 0.53, 0.0, 0.0, 0.0, 0.37, 0.90, 0.53, 0.0])
+init_joint_pos = np.array([-0.30, 0.0, 0.0, 0.70, -0.40, 0.0, -0.30, 0.0, 0.0, 0.70, -0.40, 0.0])
+# init_base_pos = np.array([0.0, 0.0, 1.225])
+init_base_pos = np.array([0.0, 0.0, 0.759])
 init_base_eular_zyx = np.array([0.0, -0.0, 0.0])
 imu_eular_bias = np.array([0.0, 0.0, 0.0])
 
@@ -166,43 +168,96 @@ class HumanoidSim(MuJoCoBase):
           # bodyImu.orientation.y = ori[2]
           # bodyImu.orientation.z = ori[3]
           # bodyImu.orientation.w = ori[0]
+
           #add imu bias
+          # pos = self.data.qpos[:3].copy()
+          # mj_quat = self.data.qpos[3:7].copy()
+          # final_quat = [mj_quat[1], mj_quat[2], mj_quat[3], mj_quat[0]]
+
+          # vel = self.data.qvel[:3].copy()
+          # angVel = self.data.qvel[3:6].copy()
+
+          # bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
+          # bodyOdom.pose.pose.position.x = pos[0]
+          # bodyOdom.pose.pose.position.y = pos[1]
+          # bodyOdom.pose.pose.position.z = pos[2]
+          # bodyOdom.pose.pose.orientation.x = final_quat[0]
+          # bodyOdom.pose.pose.orientation.y = final_quat[1]
+          # bodyOdom.pose.pose.orientation.z = final_quat[2]
+          # bodyOdom.pose.pose.orientation.w = final_quat[3]
+          # bodyOdom.twist.twist.linear.x = vel[0]
+          # bodyOdom.twist.twist.linear.y = vel[1]
+          # bodyOdom.twist.twist.linear.z = vel[2]
+          # bodyOdom.twist.twist.angular.x = angVel[0]
+          # bodyOdom.twist.twist.angular.y = angVel[1]
+          # bodyOdom.twist.twist.angular.z = angVel[2]
+          # self.pubOdom.publish(bodyOdom)
+
+          # bodyImu = Imu()
+          # acc = self.data.sensor('BodyAcc').data.copy()
+          # bodyImu.header.stamp = self.node.get_clock().now().to_msg()
+          # bodyImu.angular_velocity.x = angVel[0]
+          # bodyImu.angular_velocity.y = angVel[1]
+          # bodyImu.angular_velocity.z = angVel[2]
+          # bodyImu.linear_acceleration.x = acc[0]
+          # bodyImu.linear_acceleration.y = acc[1]
+          # bodyImu.linear_acceleration.z = acc[2]
+          # bodyImu.orientation.x = final_quat[0]
+          # bodyImu.orientation.y = final_quat[1]
+          # bodyImu.orientation.z = final_quat[2]
+          # bodyImu.orientation.w = final_quat[3]
+          # bodyImu.orientation_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+          # bodyImu.angular_velocity_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+          # bodyImu.linear_acceleration_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+          # self.pubImu.publish(bodyImu)
+
+          # ================= 1. 上帝视角 (给 Cheat Controller) =================
           pos = self.data.qpos[:3].copy()
           mj_quat = self.data.qpos[3:7].copy()
-          final_quat = [mj_quat[1], mj_quat[2], mj_quat[3], mj_quat[0]]
+          odom_quat = [mj_quat[1], mj_quat[2], mj_quat[3], mj_quat[0]]
 
           vel = self.data.qvel[:3].copy()
-          angVel = self.data.qvel[3:6].copy()
+          odom_angvel = self.data.qvel[3:6].copy()
 
+          # ================= 2. 真实传感器视角 (给 Normal Controller) =================
+          acc = self.data.sensor('BodyAcc').data.copy()
+          gyro = self.data.sensor('BodyGyro').data.copy()
+          sen_quat = self.data.sensor('BodyQuat').data.copy()
+          
+          ori_euler = R.from_quat([sen_quat[1], sen_quat[2], sen_quat[3], sen_quat[0]]).as_euler('xyz')
+          ori_euler += imu_eular_bias
+          imu_quat = R.from_euler('xyz', ori_euler).as_quat()
+
+          # ================= 3. 赋值给 Odom =================
           bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
           bodyOdom.pose.pose.position.x = pos[0]
           bodyOdom.pose.pose.position.y = pos[1]
           bodyOdom.pose.pose.position.z = pos[2]
-          bodyOdom.pose.pose.orientation.x = final_quat[0]
-          bodyOdom.pose.pose.orientation.y = final_quat[1]
-          bodyOdom.pose.pose.orientation.z = final_quat[2]
-          bodyOdom.pose.pose.orientation.w = final_quat[3]
+          bodyOdom.pose.pose.orientation.x = odom_quat[0]
+          bodyOdom.pose.pose.orientation.y = odom_quat[1]
+          bodyOdom.pose.pose.orientation.z = odom_quat[2]
+          bodyOdom.pose.pose.orientation.w = odom_quat[3]
           bodyOdom.twist.twist.linear.x = vel[0]
           bodyOdom.twist.twist.linear.y = vel[1]
           bodyOdom.twist.twist.linear.z = vel[2]
-          bodyOdom.twist.twist.angular.x = angVel[0]
-          bodyOdom.twist.twist.angular.y = angVel[1]
-          bodyOdom.twist.twist.angular.z = angVel[2]
+          bodyOdom.twist.twist.angular.x = odom_angvel[0]
+          bodyOdom.twist.twist.angular.y = odom_angvel[1]
+          bodyOdom.twist.twist.angular.z = odom_angvel[2]
           self.pubOdom.publish(bodyOdom)
 
+          # ================= 4. 赋值给 IMU =================
           bodyImu = Imu()
-          acc = self.data.sensor('BodyAcc').data.copy()
           bodyImu.header.stamp = self.node.get_clock().now().to_msg()
-          bodyImu.angular_velocity.x = angVel[0]
-          bodyImu.angular_velocity.y = angVel[1]
-          bodyImu.angular_velocity.z = angVel[2]
+          bodyImu.angular_velocity.x = gyro[0]
+          bodyImu.angular_velocity.y = gyro[1]
+          bodyImu.angular_velocity.z = gyro[2]
           bodyImu.linear_acceleration.x = acc[0]
           bodyImu.linear_acceleration.y = acc[1]
           bodyImu.linear_acceleration.z = acc[2]
-          bodyImu.orientation.x = final_quat[0]
-          bodyImu.orientation.y = final_quat[1]
-          bodyImu.orientation.z = final_quat[2]
-          bodyImu.orientation.w = final_quat[3]
+          bodyImu.orientation.x = imu_quat[0]
+          bodyImu.orientation.y = imu_quat[1]
+          bodyImu.orientation.z = imu_quat[2]
+          bodyImu.orientation.w = imu_quat[3]
           bodyImu.orientation_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
           bodyImu.angular_velocity_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
           bodyImu.linear_acceleration_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -270,21 +325,63 @@ class HumanoidSim(MuJoCoBase):
         # bodyImu.orientation.w = ori[0]
 
         #add imu bias
+        # pos = self.data.qpos[:3].copy()
+        # mj_quat = self.data.qpos[3:7].copy()
+        # final_quat = [mj_quat[1], mj_quat[2], mj_quat[3], mj_quat[0]]
+
+        # vel = self.data.qvel[:3].copy()
+        # angVel = self.data.qvel[3:6].copy()
+        
+        # bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
+        # bodyOdom.pose.pose.position.x = pos[0]
+        # bodyOdom.pose.pose.position.y = pos[1]
+        # bodyOdom.pose.pose.position.z = pos[2]
+        # bodyOdom.pose.pose.orientation.x = final_quat[0]
+        # bodyOdom.pose.pose.orientation.y = final_quat[1]
+        # bodyOdom.pose.pose.orientation.z = final_quat[2]
+        # bodyOdom.pose.pose.orientation.w = final_quat[3]
+        # bodyOdom.twist.twist.linear.x = 0.0
+        # bodyOdom.twist.twist.linear.y = 0.0
+        # bodyOdom.twist.twist.linear.z = 0.0
+        # bodyOdom.twist.twist.angular.x = 0.0
+        # bodyOdom.twist.twist.angular.y = 0.0
+        # bodyOdom.twist.twist.angular.z = 0.0
+        # self.pubOdom.publish(bodyOdom)
+
+        # bodyImu = Imu()
+        # bodyImu.header.stamp = self.node.get_clock().now().to_msg()
+        # bodyImu.angular_velocity.x = 0.0
+        # bodyImu.angular_velocity.y = 0.0
+        # bodyImu.angular_velocity.z = 0.0
+        # bodyImu.linear_acceleration.x = 0.0
+        # bodyImu.linear_acceleration.y = 0.0
+        # bodyImu.linear_acceleration.z = 9.81
+        # bodyImu.orientation.x = final_quat[0]
+        # bodyImu.orientation.y = final_quat[1]
+        # bodyImu.orientation.z = final_quat[2]
+        # bodyImu.orientation.w = final_quat[3]
+        # self.pubImu.publish(bodyImu)
+
+        # ================= 1. 上帝视角 (给 Cheat Controller) =================
         pos = self.data.qpos[:3].copy()
         mj_quat = self.data.qpos[3:7].copy()
-        final_quat = [mj_quat[1], mj_quat[2], mj_quat[3], mj_quat[0]]
+        odom_quat = [mj_quat[1], mj_quat[2], mj_quat[3], mj_quat[0]]
 
-        vel = self.data.qvel[:3].copy()
-        angVel = self.data.qvel[3:6].copy()
-        
+        # ================= 2. 真实传感器视角 (给 Normal Controller) =================
+        sen_quat = self.data.sensor('BodyQuat').data.copy()
+        ori_euler = R.from_quat([sen_quat[1], sen_quat[2], sen_quat[3], sen_quat[0]]).as_euler('xyz')
+        ori_euler += imu_eular_bias
+        imu_quat = R.from_euler('xyz', ori_euler).as_quat()
+
+        # ================= 3. 赋值给 Odom =================
         bodyOdom.header.stamp = self.node.get_clock().now().to_msg()
         bodyOdom.pose.pose.position.x = pos[0]
         bodyOdom.pose.pose.position.y = pos[1]
         bodyOdom.pose.pose.position.z = pos[2]
-        bodyOdom.pose.pose.orientation.x = final_quat[0]
-        bodyOdom.pose.pose.orientation.y = final_quat[1]
-        bodyOdom.pose.pose.orientation.z = final_quat[2]
-        bodyOdom.pose.pose.orientation.w = final_quat[3]
+        bodyOdom.pose.pose.orientation.x = odom_quat[0]
+        bodyOdom.pose.pose.orientation.y = odom_quat[1]
+        bodyOdom.pose.pose.orientation.z = odom_quat[2]
+        bodyOdom.pose.pose.orientation.w = odom_quat[3]
         bodyOdom.twist.twist.linear.x = 0.0
         bodyOdom.twist.twist.linear.y = 0.0
         bodyOdom.twist.twist.linear.z = 0.0
@@ -293,6 +390,7 @@ class HumanoidSim(MuJoCoBase):
         bodyOdom.twist.twist.angular.z = 0.0
         self.pubOdom.publish(bodyOdom)
 
+        # ================= 4. 赋值给 IMU =================
         bodyImu = Imu()
         bodyImu.header.stamp = self.node.get_clock().now().to_msg()
         bodyImu.angular_velocity.x = 0.0
@@ -301,10 +399,10 @@ class HumanoidSim(MuJoCoBase):
         bodyImu.linear_acceleration.x = 0.0
         bodyImu.linear_acceleration.y = 0.0
         bodyImu.linear_acceleration.z = 9.81
-        bodyImu.orientation.x = final_quat[0]
-        bodyImu.orientation.y = final_quat[1]
-        bodyImu.orientation.z = final_quat[2]
-        bodyImu.orientation.w = final_quat[3]
+        bodyImu.orientation.x = imu_quat[0]
+        bodyImu.orientation.y = imu_quat[1]
+        bodyImu.orientation.z = imu_quat[2]
+        bodyImu.orientation.w = imu_quat[3]
         self.pubImu.publish(bodyImu)
 
       # get framebuffer viewport
