@@ -21,6 +21,9 @@ vector_t DEFAULT_JOINT_STATE(12);
 scalar_t TIME_TO_TARGET;
 constexpr scalar_t CMD_VEL_TIME_TO_TARGET_LIMIT = 0.6;
 bool SWAP_CMD_VEL_XY = false;
+scalar_t CMD_VEL_SCALE_X = 1.0;
+scalar_t CMD_VEL_SCALE_Y = 1.0;
+scalar_t CMD_VEL_SCALE_YAW = 1.0;
 }  // namespace
 
 scalar_t estimateTimeToTarget(const vector_t& desiredBaseDisplacement) {
@@ -114,12 +117,21 @@ int main(int argc, char** argv) {
   nodeHandle->get_parameter("taskFile", taskFile);
   nodeHandle->declare_parameter<bool>("swap_cmd_vel_xy", false);
   nodeHandle->get_parameter("swap_cmd_vel_xy", SWAP_CMD_VEL_XY);
+  nodeHandle->declare_parameter<double>("cmd_vel_scale_x", 1.0);
+  nodeHandle->get_parameter("cmd_vel_scale_x", CMD_VEL_SCALE_X);
+  nodeHandle->declare_parameter<double>("cmd_vel_scale_y", 1.0);
+  nodeHandle->get_parameter("cmd_vel_scale_y", CMD_VEL_SCALE_Y);
+  nodeHandle->declare_parameter<double>("cmd_vel_scale_yaw", 1.0);
+  nodeHandle->get_parameter("cmd_vel_scale_yaw", CMD_VEL_SCALE_YAW);
 
   loadData::loadCppDataType(referenceFile, "comHeight", COM_HEIGHT);
   loadData::loadEigenMatrix(referenceFile, "defaultJointState", DEFAULT_JOINT_STATE);
   loadData::loadCppDataType(referenceFile, "targetRotationVelocity", TARGET_ROTATION_VELOCITY);
   loadData::loadCppDataType(referenceFile, "targetDisplacementVelocity", TARGET_DISPLACEMENT_VELOCITY);
   loadData::loadCppDataType(taskFile, "mpc.timeHorizon", TIME_TO_TARGET);
+
+  RCLCPP_INFO(nodeHandle->get_logger(), "cmd_vel scaling configured: x=%.3f y=%.3f yaw=%.3f (swap_xy=%s)",
+              CMD_VEL_SCALE_X, CMD_VEL_SCALE_Y, CMD_VEL_SCALE_YAW, SWAP_CMD_VEL_XY ? "true" : "false");
 
   TargetTrajectoriesPublisher target_pose_command(nodeHandle, robotName, &goalToTargetTrajectories, &cmdVelToTargetTrajectories);
 

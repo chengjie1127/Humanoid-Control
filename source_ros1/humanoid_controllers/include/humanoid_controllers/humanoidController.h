@@ -95,7 +95,7 @@ class humanoidController : public controller_interface::Controller<HybridJointIn
   contact_flag_t contactFlag_;
   vector3_t angularVel_, linearAccel_;
   matrix3_t orientationCovariance_, angularVelCovariance_, linearAccelCovariance_;
-  size_t plannedMode_ = 3;
+  size_t plannedMode_ = ModeNumber::STANCE;
   vector_t defalutJointPos_;
 };
 

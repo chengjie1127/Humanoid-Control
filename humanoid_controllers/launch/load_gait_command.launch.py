@@ -83,6 +83,11 @@ def generate_launch_description():
             'XDG_RUNTIME_DIR': os.environ.get('XDG_RUNTIME_DIR', ''),
             'XDG_CURRENT_DESKTOP': os.environ.get('XDG_CURRENT_DESKTOP', ''),
             'XDG_SESSION_TYPE': os.environ.get('XDG_SESSION_TYPE', ''),
+            # Must match controller/sim launch, otherwise DDS transports mismatch and
+            # /humanoid_mpc_mode_schedule may not reach the controller.
+            'FASTDDS_BUILTIN_TRANSPORTS': 'UDPv4',
+            # Keep domain-id consistent if user sets it.
+            'ROS_DOMAIN_ID': os.environ.get('ROS_DOMAIN_ID', ''),
         }
         env_args = [f'{key}={value}' for key, value in sanitized_env.items() if value != '']
         setup_commands = []

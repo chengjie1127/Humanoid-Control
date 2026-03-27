@@ -46,9 +46,11 @@ int main(int argc, char** argv){
         rclcpp::spin(nh);
     });
 
-    auto startTimeROS = nh->now();
+    // Keep a controller-local monotonic timebase. Using /clock directly here can
+    // deadlock at startup when simulation is intentionally paused and /clock stays 0.
+    rclcpp::Time controller_time_ros(0, 0, RCL_ROS_TIME);
     try {
-        controller.starting(startTimeROS);
+        controller.starting(controller_time_ros);
     } catch (const std::exception& e) {
         RCLCPP_ERROR(nh->get_logger(), "Controller starting exception: %s", e.what());
         rclcpp::shutdown();
@@ -73,7 +75,8 @@ int main(int argc, char** argv){
         lastTime = currentTime;
 
         try {
-            controller.update(nh->now(), elapsedTime_);
+            controller_time_ros = controller_time_ros + elapsedTime_;
+            controller.update(controller_time_ros, elapsedTime_);
         } catch (const std::exception& e) {
             RCLCPP_ERROR(nh->get_logger(), "Controller update exception: %s", e.what());
         }

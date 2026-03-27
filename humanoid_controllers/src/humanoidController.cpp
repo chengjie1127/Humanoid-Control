@@ -3,6 +3,7 @@
 //
 
 #include <pinocchio/fwd.hpp>  // forward declarations must be included first.
+#include <pinocchio/multibody/model.hpp>
 
 #include "humanoid_controllers/humanoidController.h"
 
@@ -40,9 +41,15 @@ constexpr std::array<float, 12> kStandKp = {250.0F, 250.0F, 120.0F, 250.0F, 120.
                                            250.0F, 250.0F, 120.0F, 250.0F, 120.0F, 80.0F};
 constexpr std::array<float, 12> kStandKd = {6.0F, 6.0F, 2.0F, 6.0F, 4.0F, 2.5F,
                                            6.0F, 6.0F, 2.0F, 6.0F, 4.0F, 2.5F};
-// Walk PD gains: increased to provide robust tracking against modeling errors
-constexpr std::array<float, 12> kWalkKp = {60.0F, 60.0F, 40.0F, 60.0F, 40.0F, 30.0F, 60.0F, 60.0F, 40.0F, 60.0F, 40.0F, 30.0F};
-constexpr std::array<float, 12> kWalkKd = {8.0F, 8.0F, 8.0F, 8.0F, 4.0F, 3.2F, 8.0F, 8.0F, 8.0F, 8.0F, 4.0F, 3.2F};
+// Walk PD gains: kept low so WBC feedforward torque dominates.
+// High Kp here fights WBC at contact transitions and causes tap-dance oscillation.
+constexpr std::array<float, 12> kWalkKp = {40.0F, 40.0F, 30.0F, 50.0F, 30.0F, 20.0F,
+                                           40.0F, 40.0F, 30.0F, 50.0F, 30.0F, 20.0F};
+constexpr std::array<float, 12> kWalkKd = {3.0F, 3.0F, 2.0F, 4.0F, 2.0F, 1.0F,
+                                           3.0F, 3.0F, 2.0F, 4.0F, 2.0F, 1.0F};
+// WBC torque includes gravity/dynamics compensation. Scaling it down too much
+// makes the robot "under-actuated" against gravity and leads to crouching/falls.
+constexpr float kWalkTorqueScale = 1.0F;
 }
 
 bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
@@ -91,6 +98,8 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   lastImuWallTime_ = std::chrono::steady_clock::now();
   lastDiagnosticWallTime_ = std::chrono::steady_clock::now();
   jointPosVelSub_ = controllerNh_->create_subscription<std_msgs::msg::Float32MultiArray>("/jointsPosVel", 10, std::bind(&humanoidController::jointStateCallback, this, std::placeholders::_1));
+  footContactSub_ = controllerNh_->create_subscription<std_msgs::msg::Float32MultiArray>(
+      "/foot_contact_flags", 10, std::bind(&humanoidController::footContactCallback, this, std::placeholders::_1));
   imuSub_ = controllerNh_->create_subscription<sensor_msgs::msg::Imu>("/imu", 10, std::bind(&humanoidController::ImuCallback, this, std::placeholders::_1));
   targetTorquePub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetTorque", 10);
   targetPosPub_ = controllerNh_->create_publisher<std_msgs::msg::Float32MultiArray>("/targetPos", 10);
@@ -143,6 +152,19 @@ void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr
             msg->linear_acceleration_covariance[6], msg->linear_acceleration_covariance[7], msg->linear_acceleration_covariance[8];
     receivedImu_ = true;
     lastImuWallTime_ = std::chrono::steady_clock::now();
+}
+
+void humanoidController::footContactCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg) {
+  if (msg->data.size() != measuredContactFlag_.size()) {
+    RCLCPP_ERROR_STREAM(controllerNh_->get_logger(),
+                        "Received foot contact message with wrong size: " << msg->data.size());
+    return;
+  }
+
+  for (size_t i = 0; i < measuredContactFlag_.size(); ++i) {
+    measuredContactFlag_[i] = msg->data[i] > 0.5F;
+  }
+  receivedFootContact_ = true;
 }
 
 void humanoidController::starting(const rclcpp::Time& time) {
@@ -237,7 +259,8 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
       mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
       currentObservation_.input = optimizedInput;
 
-      vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
+      const size_t activeContactMode = getActiveContactMode();
+      vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, activeContactMode, period.seconds());
       const vector_t& torque = x.tail(jointNum_);
 
       // Ramp torque blend from 0 to 1 over the warm-up period
@@ -350,7 +373,8 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     currentObservation_.input = optimizedInput;
 
     wbcTimer_.startTimer();
-    vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
+    const size_t activeContactMode = getActiveContactMode();
+    vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, activeContactMode, period.seconds());
     wbcTimer_.endTimer();
 
     const vector_t& torque = x.tail(jointNum_);
@@ -361,29 +385,26 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
 
     vector_t posDes = centroidal_model::getJointAngles(optimizedState, HumanoidInterface_->getCentroidalModelInfo());
     vector_t velDes = centroidal_model::getJointVelocities(optimizedInput, HumanoidInterface_->getCentroidalModelInfo());
+    const auto lowerJointLimits = HumanoidInterface_->getPinocchioInterface().getModel().lowerPositionLimit.tail(jointNum_);
+    const auto upperJointLimits = HumanoidInterface_->getPinocchioInterface().getModel().upperPositionLimit.tail(jointNum_);
+    for (size_t i = 0; i < jointNum_; ++i) {
+      posDes(static_cast<Eigen::Index>(i)) = std::clamp(
+          posDes(static_cast<Eigen::Index>(i)),
+          lowerJointLimits(static_cast<Eigen::Index>(i)),
+          upperJointLimits(static_cast<Eigen::Index>(i)));
+    }
 
-    scalar_t dt = period.seconds();
-    posDes = posDes + 0.5 * wbc_planned_joint_acc * dt * dt;
-    velDes = velDes + wbc_planned_joint_acc * dt;
-
-    // Release stance hold when first non-STANCE mode is planned or upcoming in the policy
+    // Release stance hold only when the CURRENT planned mode is non-STANCE.
+    // (Releasing early based on "upcoming" modes can destabilize because MPC references
+    // might start moving before the contact constraints actually switch.)
     if (initialStanceHoldActive_) {
-      bool upcomingNonStance = false;
-      const auto& modeSequence = mpcMrtInterface_->getPolicy().modeSchedule_.modeSequence;
-      for (const auto& mode : modeSequence) {
-        if (mode != ModeNumber::STANCE) {
-          upcomingNonStance = true;
-          break;
-        }
-      }
-
-      if (plannedMode_ != ModeNumber::STANCE || upcomingNonStance) {
+      if (plannedMode_ != ModeNumber::STANCE) {
         RCLCPP_INFO_STREAM(controllerNh_->get_logger(),
-            "Initial stance hold released (mode=" << plannedMode_ << ", upcomingNonStance=" << upcomingNonStance << ")");
+            "Initial stance hold released (mode=" << plannedMode_ << ")");
         initialStanceHoldActive_ = false;
         walkingBlendActive_ = true;
         walkingBlendIterations_ = 0;
-        filteredWalkTorque_ = torque;
+        filteredWalkTorque_ = vector_t::Zero(jointNum_);
         walkTorqueFilterInitialized_ = true;
       }
     }
@@ -400,12 +421,11 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
       return;
     }
 
-    // During stance hold: WBC torque + PD to default joint positions (proven stable)
+    // During stance hold, keep the joints at the current pose while applying WBC torque.
+    // In cheat control this becomes stable once startup release is delayed until warm-up has completed,
+    // and the MuJoCo actuator limits prevent the previous launch impulse.
     if (initialStanceHoldActive_ && plannedMode_ == ModeNumber::STANCE) {
       publishDiagnosticStatus(true, true, torque(0), torque(1), torque(2));
-
-      // Hold current joint angles (no posture correction) while applying WBC feedforward torque.
-      // This avoids injecting large PD torques that can fight the WBC solution.
       publishHoldCommand(torque);
 
       robotVisualizer_->update(currentObservation_, mpcMrtInterface_->getPolicy(), mpcMrtInterface_->getCommand());
@@ -434,25 +454,15 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
     // positions so the foot can follow the swing trajectory.
     constexpr int kWalkingBlendDuration = 250;  // 500ms at 500Hz
     std::array<float, 12> activeKp, activeKd;
+    float torqueBlendAlpha = 1.0f;
     if (walkingBlendActive_) {
       walkingBlendIterations_++;
       float alpha = std::min(1.0f, static_cast<float>(walkingBlendIterations_) / static_cast<float>(kWalkingBlendDuration));
-
-      // Determine which joints are on the stance leg vs swing leg
-      // Joints 0-5 = left leg, joints 6-11 = right leg
-      bool leftIsSwinging = (plannedMode_ == ModeNumber::RCONTACT);  // right foot on ground => left swings
-      bool rightIsSwinging = (plannedMode_ == ModeNumber::LCONTACT); // left foot on ground => right swings
-
-      // Blend stance-leg positions; pass through swing-leg positions fully
-      for (int i = 0; i < static_cast<int>(jointNum_); i++) {
-        bool isSwingJoint = (i < 6 && leftIsSwinging) || (i >= 6 && rightIsSwinging);
-        if (!isSwingJoint) {
-          // Stance leg (or double-support): blend from default to MPC
-          posDes(i) = (1.0 - alpha) * defalutJointPos_(i) + alpha * posDes(i);
-          velDes(i) = alpha * velDes(i);
-        }
-        // Swing leg: keep full MPC posDes/velDes for trajectory tracking
-      }
+      torqueBlendAlpha = alpha;
+      
+      // Trust MPC positions fully from the start — only alpha-scale the torque
+      // and blend PD gains. Do NOT interpolate posDes/velDes toward the default
+      // standing pose, which would lock the stance leg and fight the MPC.
 
       // Always blend PD gains smoothly
       for (int i = 0; i < 12; i++) {
@@ -468,26 +478,42 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
       activeKd = kWalkKd;
     }
 
-    // Mode-dependent PD: reduce PD gains for swing legs to avoid fighting WBC
-    // The WBC already computes optimal torques for swing trajectory tracking;
-    // but moderate PD overlay is required in imperfect physics simulation.
-    constexpr float kSwingKp = 40.0f;   // Provided moderate position PD for swing legs
-    constexpr float kSwingKd = 4.0f;    // Increased damping
-    if (plannedMode_ == ModeNumber::LCONTACT) {
-      // Left foot on ground → right leg (joints 6-11) is swinging
+    // (Pitch drift compensation removed — constant offsets fight the MPC)
+
+    // Mode-dependent PD: strengthen swing-leg tracking so the foot actually
+    // leaves the ground in cheat control while still keeping a conservative
+    // stance-leg overlay for overall stability.
+    constexpr float kSwingKp = 45.0f;
+    constexpr float kSwingKd = 3.0f;
+    // if (plannedMode_ == ModeNumber::LCONTACT) {
+    //   // Left foot on ground → right leg (joints 6-11) is swinging
+    //   for (int i = 6; i < 12; i++) {
+    //     activeKp[i] = kSwingKp;
+    //     activeKd[i] = kSwingKd;
+    //   }
+    // } else if (plannedMode_ == ModeNumber::RCONTACT) {
+    //   // Right foot on ground → left leg (joints 0-5) is swinging
+    //   for (int i = 0; i < 6; i++) {
+    //     activeKp[i] = kSwingKp;
+    //     activeKd[i] = kSwingKd;
+    //   }
+    // }
+    // 只要右脚的两个点（位1:r_toe，位3:r_heel）都是0，就说明右腿在空中摆动
+    bool rightLegSwinging = ((plannedMode_ & 2) == 0) && ((plannedMode_ & 8) == 0);
+    // 只要左脚的两个点（位0:l_toe，位2:l_heel）都是0，就说明左腿在空中摆动
+    bool leftLegSwinging = ((plannedMode_ & 1) == 0) && ((plannedMode_ & 4) == 0);
+
+    if (rightLegSwinging) {
       for (int i = 6; i < 12; i++) {
         activeKp[i] = kSwingKp;
         activeKd[i] = kSwingKd;
       }
-    } else if (plannedMode_ == ModeNumber::RCONTACT) {
-      // Right foot on ground → left leg (joints 0-5) is swinging
+    } else if (leftLegSwinging) {
       for (int i = 0; i < 6; i++) {
         activeKp[i] = kSwingKp;
         activeKd[i] = kSwingKd;
       }
     }
-
-    // (Pitch drift compensation removed — constant offsets fight the MPC)
 
     // EMA filter to smooth WBC torque chattering from high-authority QP
     constexpr float kTorqueFilterAlpha = 0.3f;
@@ -501,6 +527,10 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
       filteredWalkTorque_ = torque;
       walkTorqueFilterInitialized_ = true;
     }
+    // Avoid near-zero torque at the very beginning of the stance->walk transition.
+    // Otherwise the controller can lose support force before the blend ramps up.
+    constexpr float kTorqueBlendAlphaFloor = 0.25F;
+    walkTorque *= (std::max(torqueBlendAlpha, kTorqueBlendAlphaFloor) * kWalkTorqueScale);
 
     // (Pitch feedforward torque removed — constant offsets fight the MPC)
 
@@ -555,7 +585,8 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
     jointVel = jointVel_;
   //TODO: get contactFlag from hardware interface
   //暂时用plannedMode_代替，需要在接触传感器可靠之后修改为stateEstimate_->getMode()
-  contactFlag = modeNumber2StanceLeg(plannedMode_);
+  const auto plannedContactFlag = modeNumber2StanceLeg(plannedMode_);
+  contactFlag = receivedFootContact_ ? measuredContactFlag_ : plannedContactFlag;
 
   quat = quat_;
   angularVel = angularVel_;
@@ -565,6 +596,7 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   linearAccelCovariance = linearAccelCovariance_;
 
   stateEstimate_->updateJointStates(jointPos, jointVel);
+  stateEstimate_->updateCmdContact(plannedContactFlag);
   stateEstimate_->updateContact(contactFlag);
   stateEstimate_->updateImu(quat, angularVel, linearAccel, orientationCovariance, angularVelCovariance, linearAccelCovariance);
   measuredRbdState_ = stateEstimate_->update(time, period);
@@ -590,7 +622,7 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   currentObservation_.state(9) = yawLast + angles::shortest_angular_distance(yawLast, currentObservation_.state(9));
   //  currentObservation_.mode = stateEstimate_->getMode();
   //TODO: 暂时用plannedMode_代替，需要在接触传感器可靠之后修改为stateEstimate_->getMode()
-  currentObservation_.mode =  plannedMode_;
+  currentObservation_.mode = getActiveContactMode();
 }
 
 void humanoidController::publishStandCommand() {
@@ -681,7 +713,8 @@ void humanoidController::publishDiagnosticStatus(bool fallbackMode, bool hasTorq
   }
   lastDiagnosticWallTime_ = wallNow;
 
-  const auto contactFlag = modeNumber2StanceLeg(plannedMode_);
+  const auto activeContactMode = getActiveContactMode();
+  const auto contactFlag = modeNumber2StanceLeg(activeContactMode);
   const auto closedContacts = numberOfClosedContacts(contactFlag);
   const auto jointAgeMs = std::chrono::duration_cast<std::chrono::milliseconds>(wallNow - lastJointStateWallTime_).count();
   const auto imuAgeMs = std::chrono::duration_cast<std::chrono::milliseconds>(wallNow - lastImuWallTime_).count();
@@ -712,6 +745,7 @@ void humanoidController::publishDiagnosticStatus(bool fallbackMode, bool hasTorq
                              << " quat_wxyz=[" << quat_.w() << ", " << quat_.x() << ", " << quat_.y() << ", " << quat_.z() << "]"
                              << " torque012=" << torqueStream.str()
                              << " planned_mode=" << plannedMode_
+                             << " active_contact_mode=" << activeContactMode
                              << " contacts_closed=" << closedContacts
                              << " contact_flags=" << contactFlagsStream.str());
 }
@@ -761,13 +795,11 @@ void humanoidCheaterController::setupMpc() {
                                                                    HumanoidInterface_->getCentroidalModelInfo());
 
   const std::string robotName = "humanoid";
-
-  // For MuJoCo cheat-control STANCE stabilization we don't rely on live gait schedule updates.
-  // Avoid registering synchronized modules (e.g., GaitReceiver) to reduce the risk of blocking
-  // inside advanceMpc().
-
+  auto gaitReceiverPtr =
+      std::make_shared<GaitReceiver>(controllerNh_, HumanoidInterface_->getSwitchedModelReferenceManagerPtr()->getGaitSchedule(), robotName);
   auto rosReferenceManagerPtr = std::make_shared<RosReferenceManager>(robotName, HumanoidInterface_->getReferenceManagerPtr());
   rosReferenceManagerPtr->subscribe(controllerNh_);
+  mpc_->getSolverPtr()->addSynchronizedModule(gaitReceiverPtr);
   mpc_->getSolverPtr()->setReferenceManager(rosReferenceManagerPtr);
 
   observationPublisher_ = controllerNh_->create_publisher<ocs2_msgs::msg::MpcObservation>(robotName + "_mpc_observation", 1);
@@ -832,12 +864,6 @@ void humanoidController::setupStateEstimate(const std::string& taskFile, bool ve
 void humanoidCheaterController::setupStateEstimate(const std::string& /*taskFile*/, bool /*verbose*/) {
   stateEstimate_ = std::make_shared<FromTopicStateEstimate>(HumanoidInterface_->getPinocchioInterface(),
                                                             HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
-
-  // In MuJoCo cheat-control, joint-space PD alone cannot stabilize the floating base.
-  // The generic MPC warm-up ramps WBC feedforward torque from 0 -> 100% over a few seconds,
-  // which causes the robot to tip before sufficient stabilizing torque is applied.
-  // Disable the warm-up so full WBC torque is available immediately after unpausing.
-  disableMpcWarmup();
 }
 
 }  // namespace humanoid_controller

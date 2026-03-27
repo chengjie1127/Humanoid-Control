@@ -50,6 +50,7 @@ class humanoidController {
 
   void jointStateCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
   void ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg);
+  void footContactCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
   void publishStandCommand();
   void publishStandCommand(const vector_t& torqueFeedforward);
   void publishHoldCommand(const vector_t& torqueFeedforward);
@@ -87,6 +88,7 @@ class humanoidController {
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetKpPub_;
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetKdPub_;
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr jointPosVelSub_;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr footContactSub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 
   // Node Handle
@@ -128,8 +130,21 @@ class humanoidController {
   contact_flag_t contactFlag_;
   vector3_t angularVel_, linearAccel_;
   matrix3_t orientationCovariance_, angularVelCovariance_, linearAccelCovariance_;
-  size_t plannedMode_ = 3;
+  size_t plannedMode_ = ModeNumber::STANCE;
+  std::atomic_bool receivedFootContact_{false};
+  contact_flag_t measuredContactFlag_{false, false, false, false};
   vector_t defalutJointPos_;
+
+  size_t getActiveContactMode() const {
+    if (receivedFootContact_) {
+      for (bool in_contact : measuredContactFlag_) {
+        if (in_contact) {
+          return stanceLeg2ModeNumber(measuredContactFlag_);
+        }
+      }
+    }
+    return plannedMode_;
+  }
 };
 
 class humanoidCheaterController : public humanoidController {
@@ -139,4 +154,3 @@ class humanoidCheaterController : public humanoidController {
 };
 
 }  // namespace humanoid_controller
-

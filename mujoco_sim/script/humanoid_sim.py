@@ -7,7 +7,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from ament_index_python.packages import get_package_share_directory
-from std_msgs.msg import Float32MultiArray,Bool
+from std_msgs.msg import Float32MultiArray,Bool,Int32MultiArray
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 from rosgraph_msgs.msg import Clock
@@ -57,20 +57,20 @@ imu_eular_bias = np.array([0.0, 0.0, 0.0])
 default_stand_kp = np.array([250.0, 250.0, 120.0, 250.0, 120.0, 80.0, 250.0, 250.0, 120.0, 250.0, 120.0, 80.0])
 default_stand_kd = np.array([6.0, 6.0, 2.0, 6.0, 4.0, 2.5, 6.0, 6.0, 2.0, 6.0, 4.0, 2.5])
 
-# Canonical controller joint order (must match humanoid_interface::ModelSettings::jointNames)
-CONTROLLER_JOINT_NAMES = [
-  "left_hip_pitch_joint",
-  "left_hip_roll_joint",
-  "left_hip_yaw_joint",
-  "left_knee_joint",
-  "left_ankle_pitch_joint",
-  "left_ankle_roll_joint",
-  "right_hip_pitch_joint",
-  "right_hip_roll_joint",
-  "right_hip_yaw_joint",
-  "right_knee_joint",
-  "right_ankle_pitch_joint",
-  "right_ankle_roll_joint",
+# Canonical controller actuator order (must match MJCF <actuator> name entries)
+CONTROLLER_ACTUATOR_NAMES = [
+  "left_hip_pitch_motor",
+  "left_hip_roll_motor",
+  "left_hip_yaw_motor",
+  "left_knee_motor",
+  "left_ankle_pitch_motor",
+  "left_ankle_roll_motor",
+  "right_hip_pitch_motor",
+  "right_hip_roll_motor",
+  "right_hip_yaw_motor",
+  "right_knee_motor",
+  "right_ankle_pitch_motor",
+  "right_ankle_roll_motor",
 ]
 
 class HumanoidSim(MuJoCoBase):
@@ -93,52 +93,63 @@ class HumanoidSim(MuJoCoBase):
     self.targetKp = default_stand_kp.copy()
     self.targetKd = default_stand_kd.copy()
 
-    # Build joint/actuator index mapping so all arrays match the controller joint order.
+    # Build joint/actuator index mapping so all arrays match the controller actuator order.
     self._use_joint_map = False
-    self._joint_names = CONTROLLER_JOINT_NAMES
+    self._actuator_names = CONTROLLER_ACTUATOR_NAMES
     self._qpos_adr = None
     self._qvel_adr = None
     self._act_adr = None
     try:
       qpos_adr = []
       qvel_adr = []
-      for joint_name in self._joint_names:
-        jid = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_JOINT, joint_name)
+      act_adr = []
+      for actuator_name in self._actuator_names:
+        aid = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_ACTUATOR, actuator_name)
+        if aid < 0:
+          raise RuntimeError(f"MuJoCo actuator not found: {actuator_name}")
+
+        jid = int(self.model.actuator_trnid[aid][0])
         if jid < 0:
-          raise RuntimeError(f"MuJoCo joint not found: {joint_name}")
+          raise RuntimeError(f"Actuator {actuator_name} is not attached to a joint")
+
         qpos_adr.append(int(self.model.jnt_qposadr[jid]))
         qvel_adr.append(int(self.model.jnt_dofadr[jid]))
-
-      act_for_joint = {}
-      for aid in range(self.model.nu):
-        trnid = self.model.actuator_trnid[aid]
-        jid = int(trnid[0])
-        if jid < 0:
-          continue
-        jname = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_JOINT, jid)
-        if jname and jname not in act_for_joint:
-          act_for_joint[jname] = aid
-
-      act_adr = []
-      for joint_name in self._joint_names:
-        if joint_name not in act_for_joint:
-          raise RuntimeError(f"No actuator found for joint: {joint_name}")
-        act_adr.append(int(act_for_joint[joint_name]))
+        act_adr.append(int(aid))
 
       self._qpos_adr = np.array(qpos_adr, dtype=np.int32)
       self._qvel_adr = np.array(qvel_adr, dtype=np.int32)
       self._act_adr = np.array(act_adr, dtype=np.int32)
       self._use_joint_map = True
-      print(f"[HumanoidSim] Using joint-name mapping for commands/states (nu={self.model.nu}).")
+      print(f"[HumanoidSim] Using actuator-name mapping for commands/states (nu={self.model.nu}).")
     except Exception as e:
       self.node.get_logger().error(f"[HumanoidSim] Joint/actuator mapping failed; falling back to qpos[-12:] ordering: {e}")
       self._use_joint_map = False
+
+    ctrl_range = np.asarray(self.model.actuator_ctrlrange, dtype=np.float64)
+    if self._use_joint_map:
+      self._actuator_ctrl_lower = ctrl_range[self._act_adr, 0].copy()
+      self._actuator_ctrl_upper = ctrl_range[self._act_adr, 1].copy()
+    else:
+      self._actuator_ctrl_lower = ctrl_range[:, 0].copy()
+      self._actuator_ctrl_upper = ctrl_range[:, 1].copy()
 
     self.pubJoints = self.node.create_publisher(Float32MultiArray, '/jointsPosVel', 10)
     self.pubOdom = self.node.create_publisher(Odometry, '/ground_truth/state', 10)
     self.pubImu = self.node.create_publisher(Imu, '/imu', 10)
     self.pubRealTorque = self.node.create_publisher(Float32MultiArray, '/realTorque', 10)
+    self.pubFootContact = self.node.create_publisher(Float32MultiArray, '/foot_contact_flags', 10)
+    # Debug: count actual MuJoCo contact points between ground and each foot-contact geom.
+    # Order matches humanoid_interface::ModelSettings::contactNames3DoF: [l_toe, r_toe, l_heel, r_heel]
+    self.pubFootContactGeomCounts = self.node.create_publisher(Int32MultiArray, '/foot_contact_geom_counts', 10)
     self.pubClock = self.node.create_publisher(Clock, '/clock', 10)
+
+    self._ground_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'ground')
+    self._left_foot_toe_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'left_foot_toe_contact')
+    self._left_foot_heel_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'left_foot_heel_contact')
+    self._right_foot_toe_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'right_foot_toe_contact')
+    self._right_foot_heel_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'right_foot_heel_contact')
+    self._left_foot_body_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, 'left_ankle_roll_link')
+    self._right_foot_body_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, 'right_ankle_roll_link')
 
     self.node.create_subscription(Float32MultiArray, "/targetTorque", self.targetTorqueCallback, qos_profile_sensor_data) 
     self.node.create_subscription(Float32MultiArray, "/targetPos", self.targetPosCallback, qos_profile_sensor_data) 
@@ -345,10 +356,13 @@ class HumanoidSim(MuJoCoBase):
               q = self.data.qpos[self._qpos_adr].copy()
               qd = self.data.qvel[self._qvel_adr].copy()
               u = self.targetTorque + self.targetKp * (self.targetPos - q) + self.targetKd * (self.targetVel - qd)
+              u = np.clip(u, self._actuator_ctrl_lower, self._actuator_ctrl_upper)
               # Apply in the controller joint order.
               self.data.ctrl[self._act_adr] = u
             else:
-              self.data.ctrl[:] = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
+              u = self.targetTorque + self.targetKp * (self.targetPos - self.data.qpos[-12:]) + self.targetKd * (self.targetVel - self.data.qvel[-12:])
+              u = np.clip(u, self._actuator_ctrl_lower, self._actuator_ctrl_upper)
+              self.data.ctrl[:] = u
             # Step simulation environment
             mj.mj_step(self.model, self.data)
             sim_epoch_start = time.time()
@@ -418,6 +432,14 @@ class HumanoidSim(MuJoCoBase):
           bodyImu.linear_acceleration_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
           self.pubImu.publish(bodyImu)
 
+          footContact = Float32MultiArray()
+          footContact.data = self._compute_foot_contact_flags().tolist()
+          self.pubFootContact.publish(footContact)
+
+          footContactCounts = Int32MultiArray()
+          footContactCounts.data = self._compute_foot_contact_geom_counts()
+          self.pubFootContactGeomCounts.publish(footContactCounts)
+
           publish_time = self.data.time
 
       if (self.data.time - torque_publish_time >= 1.0 / 40.0):
@@ -483,6 +505,14 @@ class HumanoidSim(MuJoCoBase):
         bodyImu.orientation.w = float(ori_new[3])
         self.pubImu.publish(bodyImu)
 
+        footContact = Float32MultiArray()
+        footContact.data = self._compute_foot_contact_flags().tolist()
+        self.pubFootContact.publish(footContact)
+
+        footContactCounts = Int32MultiArray()
+        footContactCounts.data = self._compute_foot_contact_geom_counts()
+        self.pubFootContactGeomCounts.publish(footContactCounts)
+
         self._publish_clock()
 
       # get framebuffer viewport
@@ -502,6 +532,40 @@ class HumanoidSim(MuJoCoBase):
       glfw.poll_events()
 
     glfw.terminate()
+
+  def _compute_foot_contact_flags(self):
+    counts = self._compute_foot_contact_geom_counts()
+    return np.array([1.0 if count > 0 else 0.0 for count in counts], dtype=np.float64)
+
+  def _compute_foot_contact_geom_counts(self):
+    """
+    Count actual MuJoCo contact points between 'ground' and each specific foot-contact geom.
+    This is different from /foot_contact_flags which is a coarse left/right boolean.
+    """
+    counts = [0, 0, 0, 0]  # [l_toe, r_toe, l_heel, r_heel]
+    for contact_index in range(self.data.ncon):
+      contact = self.data.contact[contact_index]
+      geom1 = int(contact.geom1)
+      geom2 = int(contact.geom2)
+
+      # Identify which side is 'ground'
+      if geom1 == self._ground_geom_id:
+        other_geom = geom2
+      elif geom2 == self._ground_geom_id:
+        other_geom = geom1
+      else:
+        continue
+
+      if other_geom == self._left_foot_toe_geom_id:
+        counts[0] += 1
+      elif other_geom == self._right_foot_toe_geom_id:
+        counts[1] += 1
+      elif other_geom == self._left_foot_heel_geom_id:
+        counts[2] += 1
+      elif other_geom == self._right_foot_heel_geom_id:
+        counts[3] += 1
+
+    return counts
 
 def main(args=None):
     # ros init

@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, ExecuteProcess
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -94,6 +95,7 @@ def create_gait_terminal_action():
 def generate_launch_description():
     launch_actions = [
         DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('launch_teleop', default_value='false'),
         DeclareLaunchArgument('taskFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/mpc/task.info'])),
         DeclareLaunchArgument('referenceFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/reference.info'])),
         DeclareLaunchArgument('urdfFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_control.urdf'])),
@@ -130,6 +132,9 @@ def generate_launch_description():
                 'urdfFile': LaunchConfiguration('urdfFile'),
                 'urdfFileOrigin': LaunchConfiguration('urdfFileOrigin'),
                 'gaitCommandFile': LaunchConfiguration('gaitCommandFile'),
+                'cmd_vel_scale_x': -1.0,
+                'cmd_vel_scale_y': 1.0,
+                'cmd_vel_scale_yaw': 1.0,
                 'use_sim_time': LaunchConfiguration('use_sim_time')
             }]
         ),
@@ -161,6 +166,7 @@ def generate_launch_description():
             executable='teleop.py',
             name='teleop',
             output='screen',
+            condition=IfCondition(LaunchConfiguration('launch_teleop')),
             additional_env={'FASTDDS_BUILTIN_TRANSPORTS': 'UDPv4'},
             parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
         )

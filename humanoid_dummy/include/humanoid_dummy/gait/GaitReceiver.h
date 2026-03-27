@@ -63,6 +63,7 @@ class GaitReceiver : public SolverSynchronizedModule {
   std::mutex receivedGaitMutex_;
   std::atomic_bool gaitUpdated_;
   ModeSequenceTemplate receivedGait_;
+  rclcpp::Logger logger_;
 };
 
 }  // namespace humanoid

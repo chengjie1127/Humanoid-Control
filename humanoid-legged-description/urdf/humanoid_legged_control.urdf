@@ -121,7 +121,7 @@
   </joint>
 
   <!-- Left foot contact frames -->
-  <link name="l_foot_toe"></link>
+  <!-- <link name="l_foot_toe"></link>
   <joint name="l_foot_toe_joint" type="fixed">
     <origin xyz="0.12 0 -0.03" rpy="0 0 0"/>
     <parent link="left_ankle_roll_link"/>
@@ -130,6 +130,19 @@
   <link name="l_foot_heel"></link>
   <joint name="l_foot_heel_joint" type="fixed">
     <origin xyz="-0.05 0 -0.03" rpy="0 0 0"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="l_foot_heel"/>
+  </joint> -->
+  <link name="l_foot_toe"></link>
+  <joint name="l_foot_toe_joint" type="fixed">
+    <origin xyz="0.12 0 -0.035" rpy="0 0 0"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="l_foot_toe"/>
+  </joint>
+
+  <link name="l_foot_heel"></link>
+  <joint name="l_foot_heel_joint" type="fixed">
+    <origin xyz="-0.05 0 -0.035" rpy="0 0 0"/>
     <parent link="left_ankle_roll_link"/>
     <child link="l_foot_heel"/>
   </joint>
@@ -232,7 +245,7 @@
   </joint>
 
   <!-- Right foot contact frames -->
-  <link name="r_foot_toe"></link>
+  <!-- <link name="r_foot_toe"></link>
   <joint name="r_foot_toe_joint" type="fixed">
     <origin xyz="0.12 0 -0.03" rpy="0 0 0"/>
     <parent link="right_ankle_roll_link"/>
@@ -241,6 +254,19 @@
   <link name="r_foot_heel"></link>
   <joint name="r_foot_heel_joint" type="fixed">
     <origin xyz="-0.05 0 -0.03" rpy="0 0 0"/>
+    <parent link="right_ankle_roll_link"/>
+    <child link="r_foot_heel"/>
+  </joint> -->
+  <link name="r_foot_toe"></link>
+  <joint name="r_foot_toe_joint" type="fixed">
+    <origin xyz="0.12 0 -0.035" rpy="0 0 0"/>
+    <parent link="right_ankle_roll_link"/>
+    <child link="r_foot_toe"/>
+  </joint>
+
+  <link name="r_foot_heel"></link>
+  <joint name="r_foot_heel_joint" type="fixed">
+    <origin xyz="-0.05 0 -0.035" rpy="0 0 0"/>
     <parent link="right_ankle_roll_link"/>
     <child link="r_foot_heel"/>
   </joint>
