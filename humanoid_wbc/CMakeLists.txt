@@ -9,7 +9,7 @@ find_package(Boost REQUIRED COMPONENTS
   log_setup
 )
 find_package(humanoid_interface REQUIRED)
-find_package(qpoases_catkin REQUIRED)
+find_package(qpoases REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 find_package(PkgConfig REQUIRED)
@@ -43,9 +43,9 @@ add_library(${PROJECT_NAME} SHARED
 
 target_link_libraries(${PROJECT_NAME}
         ${pinocchio_LIBRARIES}
-        ${qpoases_catkin_LIBRARIES}
+        ${qpoases_LIBRARIES}
         )
-target_include_directories(${PROJECT_NAME} PUBLIC ${qpoases_catkin_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PUBLIC ${qpoases_INCLUDE_DIRS})
 ament_target_dependencies(${PROJECT_NAME} humanoid_interface)
 
 # OCS2_CXX_FLAGS usually comes from ocs2_core or similar, we can safely just use target_compile_options if needed
@@ -58,7 +58,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
-ament_export_dependencies(humanoid_interface qpoases_catkin)
+ament_export_dependencies(humanoid_interface qpoases)
 ament_export_dependencies(pinocchio)
 
 install(TARGETS ${PROJECT_NAME}

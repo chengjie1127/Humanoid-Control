@@ -11,7 +11,7 @@
     <buildtool_depend>ament_cmake</buildtool_depend>
 
     <depend>humanoid_interface</depend>
-    <depend>qpoases_catkin</depend>
+    <depend>qpoases</depend>
     <depend>pinocchio</depend>
 
     <export>
