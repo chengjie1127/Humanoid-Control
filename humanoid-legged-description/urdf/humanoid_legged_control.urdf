@@ -379,6 +379,7 @@
   </link>
   <joint name="left_elbow_joint" type="fixed">
     <origin xyz="0.015783 0 -0.080518" rpy="0 0 0"/>
+    <!-- <origin xyz="0.015783 0 -0.080518" rpy="0 1.5708 0"/> -->
     <parent link="left_shoulder_yaw_link"/>
     <child link="left_elbow_link"/>
   </joint>
@@ -445,6 +446,7 @@
   </link>
   <joint name="right_elbow_joint" type="fixed">
     <origin xyz="0.015783 0 -0.080518" rpy="0 0 0"/>
+    <!-- <origin xyz="0.015783 0 -0.080518" rpy="0 1.5708 0"/> -->
     <parent link="right_shoulder_yaw_link"/>
     <child link="right_elbow_link"/>
   </joint>
