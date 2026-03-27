@@ -48,7 +48,8 @@ GaitKeyboardPublisher::GaitKeyboardPublisher(std::shared_ptr<rclcpp::Node> node,
   RCLCPP_INFO_STREAM(node_->get_logger(), robotName + "_mpc_mode_schedule node is setting up ...");
   loadData::loadStdVector(gaitFile, "list", gaitList_, verbose);
 
-  modeSequenceTemplatePublisher_ = node_->create_publisher<ocs2_msgs::msg::ModeSchedule>(robotName + "_mpc_mode_schedule", 1);
+  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  modeSequenceTemplatePublisher_ = node_->create_publisher<ocs2_msgs::msg::ModeSchedule>(robotName + "_mpc_mode_schedule", qos);
 
   gaitMap_.clear();
   for (const auto& gaitName : gaitList_) {

@@ -44,14 +44,15 @@ feet_array_t<std::vector<bool>> extractContactFlags(const std::vector<size_t>& p
 }
 
 StateEstimateBase::StateEstimateBase(PinocchioInterface pinocchioInterface, CentroidalModelInfo info,
-                                     const PinocchioEndEffectorKinematics& eeKinematics)
+                                     const PinocchioEndEffectorKinematics& eeKinematics,
+                                     const rclcpp::Node::SharedPtr& node)
   : pinocchioInterface_(std::move(pinocchioInterface))
   , info_(std::move(info))
   , eeKinematics_(eeKinematics.clone())
   , rbdState_(vector_t ::Zero(2 * info_.generalizedCoordinatesNum))
   , latestStanceposition_{}
 {
-  node_ = std::make_shared<rclcpp::Node>("humanoid_estimation_state");
+  node_ = node ? node : std::make_shared<rclcpp::Node>("humanoid_estimation_state");
   odomPub_ = node_->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
   posePub_ = node_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose", 10);
   lastPub_ = node_->now();

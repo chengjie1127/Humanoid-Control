@@ -33,7 +33,16 @@ find_package(Boost REQUIRED COMPONENTS
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 find_package(PkgConfig REQUIRED)
+find_package(pinocchio REQUIRED CONFIG)
 pkg_check_modules(pinocchio REQUIRED pinocchio)
+
+if(NOT TARGET pinocchio::pinocchio)
+  add_library(pinocchio::pinocchio INTERFACE IMPORTED)
+  set_target_properties(pinocchio::pinocchio PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${pinocchio_INCLUDE_DIRS}"
+    INTERFACE_LINK_LIBRARIES "${pinocchio_LIBRARIES}"
+  )
+endif()
 
 # Resolve for the package path at compile time.
 configure_file (
@@ -84,16 +93,14 @@ add_library(${PROJECT_NAME} SHARED
   src/HumanoidPreComputation.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
+target_link_libraries(${PROJECT_NAME}
   ${Boost_LIBRARIES}
   ${pinocchio_LIBRARIES}
   dl
 )
-foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
-  if (NOT ${dep} MATCHES "ocs2_robotic_assets")
-    target_link_libraries(${PROJECT_NAME} PUBLIC ${dep}::${dep})
-  endif()
-endforeach()
+ament_target_dependencies(${PROJECT_NAME}
+  ${AMENT_PACKAGE_DEPENDENCIES}
+)
 
 target_compile_options(${PROJECT_NAME} PUBLIC ${FLAGS})
 
@@ -111,6 +118,7 @@ foreach(dep ${AMENT_PACKAGE_DEPENDENCIES})
 endforeach()
 ament_export_dependencies(Boost)
 ament_export_dependencies(Eigen3)
+ament_export_dependencies(pinocchio)
 
 install(TARGETS ${PROJECT_NAME}
   EXPORT export_${PROJECT_NAME}

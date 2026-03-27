@@ -45,6 +45,12 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   setupHumanoidInterface(taskFile, urdfFile, referenceFile, verbose);
   setupMpc();
   setupMrt();
+
+  CentroidalModelPinocchioMapping pinocchioMapping(HumanoidInterface_->getCentroidalModelInfo());
+  eeKinematicsPtr_ = std::make_shared<PinocchioEndEffectorKinematics>(
+      HumanoidInterface_->getPinocchioInterface(), pinocchioMapping,
+      HumanoidInterface_->modelSettings().contactNames3DoF);
+
   // Visualization
   robotVisualizer_ = std::make_shared<HumanoidVisualizer>(HumanoidInterface_->getPinocchioInterface(),
                                                              HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
@@ -314,7 +320,7 @@ void humanoidController::setupMrt() {
 
 void humanoidController::setupStateEstimate(const std::string& taskFile, bool verbose) {
   stateEstimate_ = std::make_shared<KalmanFilterEstimate>(HumanoidInterface_->getPinocchioInterface(),
-                                                          HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_);
+                                                          HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
   dynamic_cast<KalmanFilterEstimate&>(*stateEstimate_).loadSettings(taskFile, verbose);
   currentObservation_.time = 0;
 }

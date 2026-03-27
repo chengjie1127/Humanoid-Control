@@ -10,8 +10,11 @@ at www.bridgedp.com.
 ********************************************************************************/
 
 #pragma once
-#include <hardware_interface/internal/hardware_resource_manager.h>
-#include <hardware_interface/joint_state_interface.h>
+#include <cassert>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace ocs2 {
 namespace humanoid
@@ -25,8 +28,7 @@ public:
   {
     if (isContact == nullptr)
     {
-      throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + name +
-                                                           "'. isContact pointer is null.");
+      throw std::runtime_error("Cannot create handle '" + name + "'. isContact pointer is null.");
     }
   }
 
@@ -48,8 +50,50 @@ private:
 };
 
 class ContactSensorInterface
-  : public hardware_interface::HardwareResourceManager<ContactSensorHandle, hardware_interface::DontClaimResources>
 {
+public:
+  void registerHandle(const ContactSensorHandle& handle)
+  {
+    const auto [_, inserted] = handles_.emplace(handle.getName(), handle);
+    if (!inserted)
+    {
+      throw std::runtime_error("Cannot register handle '" + handle.getName() + "'. Name already exists.");
+    }
+  }
+
+  ContactSensorHandle& getHandle(const std::string& name)
+  {
+    auto it = handles_.find(name);
+    if (it == handles_.end())
+    {
+      throw std::runtime_error("Cannot get handle '" + name + "'. Name does not exist.");
+    }
+    return it->second;
+  }
+
+  const ContactSensorHandle& getHandle(const std::string& name) const
+  {
+    auto it = handles_.find(name);
+    if (it == handles_.end())
+    {
+      throw std::runtime_error("Cannot get handle '" + name + "'. Name does not exist.");
+    }
+    return it->second;
+  }
+
+  std::vector<std::string> getNames() const
+  {
+    std::vector<std::string> names;
+    names.reserve(handles_.size());
+    for (const auto& kv : handles_)
+    {
+      names.push_back(kv.first);
+    }
+    return names;
+  }
+
+private:
+  std::unordered_map<std::string, ContactSensorHandle> handles_;
 };
 
 }  // namespace humanoid

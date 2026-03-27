@@ -21,7 +21,16 @@ find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 find_package(PkgConfig REQUIRED)
+find_package(pinocchio REQUIRED CONFIG)
 pkg_check_modules(pinocchio REQUIRED pinocchio)
+
+if(NOT TARGET pinocchio::pinocchio)
+        add_library(pinocchio::pinocchio INTERFACE IMPORTED)
+        set_target_properties(pinocchio::pinocchio PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${pinocchio_INCLUDE_DIRS}"
+                INTERFACE_LINK_LIBRARIES "${pinocchio_LIBRARIES}"
+        )
+endif()
 
 include_directories(
         include
@@ -63,6 +72,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(rclcpp humanoid_common realtime_tools tf2_ros tf2_geometry_msgs humanoid_interface geometry_msgs nav_msgs std_msgs)
+ament_export_dependencies(pinocchio)
 
 install(TARGETS ${PROJECT_NAME}
         EXPORT export_${PROJECT_NAME}

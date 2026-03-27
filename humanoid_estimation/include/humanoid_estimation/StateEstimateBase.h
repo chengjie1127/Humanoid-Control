@@ -37,7 +37,8 @@ class StateEstimateBase
 {
 public:
   StateEstimateBase(PinocchioInterface pinocchioInterface, CentroidalModelInfo info,
-                    const PinocchioEndEffectorKinematics& eeKinematics);
+                    const PinocchioEndEffectorKinematics& eeKinematics,
+                    const rclcpp::Node::SharedPtr& node = nullptr);
   virtual void updateJointStates(const vector_t& jointPos, const vector_t& jointVel);
   virtual void updateContact(contact_flag_t contactFlag)
   {

@@ -35,7 +35,16 @@ find_package(Boost REQUIRED COMPONENTS
 )
 
 find_package(PkgConfig REQUIRED)
+find_package(pinocchio REQUIRED CONFIG)
 pkg_check_modules(pinocchio REQUIRED pinocchio)
+
+if(NOT TARGET pinocchio::pinocchio)
+  add_library(pinocchio::pinocchio INTERFACE IMPORTED)
+  set_target_properties(pinocchio::pinocchio PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${pinocchio_INCLUDE_DIRS}"
+    INTERFACE_LINK_LIBRARIES "${pinocchio_LIBRARIES}"
+  )
+endif()
 
 include_directories(
   include

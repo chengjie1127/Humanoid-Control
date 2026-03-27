@@ -40,6 +40,7 @@ endif()
 
 add_library(realtime_tools SHARED
   src/realtime_clock.cpp
+  src/realtime_helpers.cpp
 )
 target_compile_features(realtime_tools PUBLIC cxx_std_17)
 target_include_directories(realtime_tools PUBLIC
@@ -47,6 +48,13 @@ target_include_directories(realtime_tools PUBLIC
   $<INSTALL_INTERFACE:include/realtime_tools>
 )
 ament_target_dependencies(realtime_tools PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
+if(NOT WIN32)
+  target_link_libraries(realtime_tools PUBLIC cap)
+endif()
+
+# Backward-compatible target name still referenced by tests/downstream code.
+add_library(thread_priority INTERFACE)
+target_link_libraries(thread_priority INTERFACE realtime_tools)
 
 
 

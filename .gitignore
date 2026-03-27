@@ -1,3 +1,5 @@
 humanoid-control/build/
 install/
 log/
+__pycache__/
+*.py[cod]

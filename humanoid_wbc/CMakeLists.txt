@@ -13,7 +13,16 @@ find_package(qpoases_catkin REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 find_package(PkgConfig REQUIRED)
+find_package(pinocchio REQUIRED CONFIG)
 pkg_check_modules(pinocchio REQUIRED pinocchio)
+
+if(NOT TARGET pinocchio::pinocchio)
+        add_library(pinocchio::pinocchio INTERFACE IMPORTED)
+        set_target_properties(pinocchio::pinocchio PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${pinocchio_INCLUDE_DIRS}"
+                INTERFACE_LINK_LIBRARIES "${pinocchio_LIBRARIES}"
+        )
+endif()
 
 include_directories(
         include
@@ -50,6 +59,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(humanoid_interface qpoases_catkin)
+ament_export_dependencies(pinocchio)
 
 install(TARGETS ${PROJECT_NAME}
         EXPORT export_${PROJECT_NAME}

@@ -31,7 +31,8 @@ class KalmanFilterEstimate : public StateEstimateBase
 {
 public:
   KalmanFilterEstimate(PinocchioInterface pinocchioInterface, CentroidalModelInfo info,
-                       const PinocchioEndEffectorKinematics& eeKinematics);
+                       const PinocchioEndEffectorKinematics& eeKinematics,
+                       const rclcpp::Node::SharedPtr& node = nullptr);
 
   vector_t update(const rclcpp::Time& time, const rclcpp::Duration& period) override;
 

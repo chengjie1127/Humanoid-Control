@@ -19,7 +19,7 @@ namespace humanoid
 {
 FromTopicStateEstimate::FromTopicStateEstimate(PinocchioInterface pinocchioInterface, CentroidalModelInfo info,
                                                const PinocchioEndEffectorKinematics& eeKinematics, const rclcpp::Node::SharedPtr& nh)
-  : StateEstimateBase(std::move(pinocchioInterface), std::move(info), eeKinematics)
+  : StateEstimateBase(std::move(pinocchioInterface), std::move(info), eeKinematics, nh)
 {
   sub_ = nh->create_subscription<nav_msgs::msg::Odometry>(
       "/ground_truth/state", 10, std::bind(&FromTopicStateEstimate::callback, this, std::placeholders::_1));

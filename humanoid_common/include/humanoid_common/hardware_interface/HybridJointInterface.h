@@ -10,13 +10,68 @@ at www.bridgedp.com.
 ********************************************************************************/
 
 #pragma once
-#include <hardware_interface/internal/hardware_resource_manager.h>
-#include <hardware_interface/joint_state_interface.h>
+#include <cassert>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace ocs2 {
 namespace humanoid
 {
-class HybridJointHandle : public hardware_interface::JointStateHandle
+class JointStateHandle
+{
+public:
+  JointStateHandle() = default;
+
+  JointStateHandle(const std::string& name, const double* pos, const double* vel, const double* eff)
+    : name_(name), pos_(pos), vel_(vel), eff_(eff)
+  {
+    if (pos_ == nullptr)
+    {
+      throw std::runtime_error("Cannot create handle '" + name + "'. Position pointer is null.");
+    }
+    if (vel_ == nullptr)
+    {
+      throw std::runtime_error("Cannot create handle '" + name + "'. Velocity pointer is null.");
+    }
+    if (eff_ == nullptr)
+    {
+      throw std::runtime_error("Cannot create handle '" + name + "'. Effort pointer is null.");
+    }
+  }
+
+  std::string getName() const
+  {
+    return name_;
+  }
+
+  double getPosition() const
+  {
+    assert(pos_);
+    return *pos_;
+  }
+
+  double getVelocity() const
+  {
+    assert(vel_);
+    return *vel_;
+  }
+
+  double getEffort() const
+  {
+    assert(eff_);
+    return *eff_;
+  }
+
+private:
+  std::string name_;
+  const double* pos_ = { nullptr };
+  const double* vel_ = { nullptr };
+  const double* eff_ = { nullptr };
+};
+
+class HybridJointHandle : public JointStateHandle
 {
 public:
   HybridJointHandle() = default;
@@ -26,28 +81,23 @@ public:
   {
     if (posDes_ == nullptr)
     {
-      throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + js.getName() +
-                                                           "'. Position desired data pointer is null.");
+      throw std::runtime_error("Cannot create handle '" + js.getName() + "'. Position desired data pointer is null.");
     }
     if (velDes_ == nullptr)
     {
-      throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + js.getName() +
-                                                           "'. Velocity desired data pointer is null.");
+      throw std::runtime_error("Cannot create handle '" + js.getName() + "'. Velocity desired data pointer is null.");
     }
     if (kp_ == nullptr)
     {
-      throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + js.getName() +
-                                                           "'. Kp data pointer is null.");
+      throw std::runtime_error("Cannot create handle '" + js.getName() + "'. Kp data pointer is null.");
     }
     if (kd_ == nullptr)
     {
-      throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + js.getName() +
-                                                           "'. Kd data pointer is null.");
+      throw std::runtime_error("Cannot create handle '" + js.getName() + "'. Kd data pointer is null.");
     }
     if (ff_ == nullptr)
     {
-      throw hardware_interface::HardwareInterfaceException("Cannot create handle '" + js.getName() +
-                                                           "'. Feedforward data pointer is null.");
+      throw std::runtime_error("Cannot create handle '" + js.getName() + "'. Feedforward data pointer is null.");
     }
   }
   void setPositionDesired(double cmd)
@@ -118,8 +168,50 @@ private:
 };
 
 class HybridJointInterface
-  : public hardware_interface::HardwareResourceManager<HybridJointHandle, hardware_interface::ClaimResources>
 {
+public:
+  void registerHandle(const HybridJointHandle& handle)
+  {
+    const auto [_, inserted] = handles_.emplace(handle.getName(), handle);
+    if (!inserted)
+    {
+      throw std::runtime_error("Cannot register handle '" + handle.getName() + "'. Name already exists.");
+    }
+  }
+
+  HybridJointHandle& getHandle(const std::string& name)
+  {
+    auto it = handles_.find(name);
+    if (it == handles_.end())
+    {
+      throw std::runtime_error("Cannot get handle '" + name + "'. Name does not exist.");
+    }
+    return it->second;
+  }
+
+  const HybridJointHandle& getHandle(const std::string& name) const
+  {
+    auto it = handles_.find(name);
+    if (it == handles_.end())
+    {
+      throw std::runtime_error("Cannot get handle '" + name + "'. Name does not exist.");
+    }
+    return it->second;
+  }
+
+  std::vector<std::string> getNames() const
+  {
+    std::vector<std::string> names;
+    names.reserve(handles_.size());
+    for (const auto& kv : handles_)
+    {
+      names.push_back(kv.first);
+    }
+    return names;
+  }
+
+private:
+  std::unordered_map<std::string, HybridJointHandle> handles_;
 };
 
 }  // namespace humanoid

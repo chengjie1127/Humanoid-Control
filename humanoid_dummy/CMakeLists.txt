@@ -41,7 +41,16 @@ find_package(Boost REQUIRED COMPONENTS
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 find_package(PkgConfig REQUIRED)
+find_package(pinocchio REQUIRED CONFIG)
 pkg_check_modules(pinocchio REQUIRED pinocchio)
+
+if(NOT TARGET pinocchio::pinocchio)
+  add_library(pinocchio::pinocchio INTERFACE IMPORTED)
+  set_target_properties(pinocchio::pinocchio PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${pinocchio_INCLUDE_DIRS}"
+    INTERFACE_LINK_LIBRARIES "${pinocchio_LIBRARIES}"
+  )
+endif()
 
 
 include_directories(
@@ -164,5 +173,6 @@ install(DIRECTORY launch rviz
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(${AMENT_PACKAGE_DEPENDENCIES})
+ament_export_dependencies(pinocchio)
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_package()

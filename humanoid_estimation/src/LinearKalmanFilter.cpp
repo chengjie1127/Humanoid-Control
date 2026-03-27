@@ -26,8 +26,9 @@ namespace ocs2
 namespace humanoid
 {
 KalmanFilterEstimate::KalmanFilterEstimate(PinocchioInterface pinocchioInterface, CentroidalModelInfo info,
-                                           const PinocchioEndEffectorKinematics& eeKinematics)
-  : StateEstimateBase(std::move(pinocchioInterface), std::move(info), eeKinematics)
+                                           const PinocchioEndEffectorKinematics& eeKinematics,
+                                           const rclcpp::Node::SharedPtr& node)
+  : StateEstimateBase(std::move(pinocchioInterface), std::move(info), eeKinematics, node)
   , tfBuffer_(node_->get_clock())
   , tfListener_(tfBuffer_)
   , topicUpdated_(false)

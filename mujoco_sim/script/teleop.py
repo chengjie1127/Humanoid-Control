@@ -16,8 +16,8 @@ class KeyboardController:
     def on_press(self, key):
         try:
             if key.char == 'z':
-                # Shutdown signal can be handled gracefully
-                pass
+                rclpy.shutdown()
+                return
             else:
                 if key.char == 'w':
                     self.twist_msg.linear.x = 0.4

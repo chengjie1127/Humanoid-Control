@@ -53,7 +53,7 @@ int main(int argc, char** argv){
             lastTime = currentTime;
 
             // Check cycle time for excess delay
-//            const double cycle_time_error = (elapsedTime_ - ros::Duration(desiredDuration.count())).toSec();
+//            const double cycle_time_error = (elapsedTime_ - rclcpp::Duration::from_seconds(desiredDuration.count())).seconds();
 //            if (cycle_time_error > cycleTimeErrorThreshold_) {
 //                ROS_WARN_STREAM("Cycle time exceeded error threshold by: " << cycle_time_error - cycleTimeErrorThreshold_ << "s, "
 //                                                                           << "cycle time: " << elapsedTime_ << "s, "
