@@ -47,6 +47,7 @@ class humanoidController {
 
   void jointStateCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
   void ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg);
+  void contactCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
 
   // Interface
   std::shared_ptr<HumanoidInterface> HumanoidInterface_;
@@ -78,6 +79,8 @@ class humanoidController {
   rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr targetKdPub_;
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr jointPosVelSub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr contactSub_;
+  ocs2::humanoid::contact_flag_t measuredContactFlag_{true, true};
 
   // Node Handle
   std::shared_ptr<rclcpp::Node> controllerNh_;
@@ -96,6 +99,7 @@ class humanoidController {
   matrix3_t orientationCovariance_, angularVelCovariance_, linearAccelCovariance_;
   size_t plannedMode_ = 3;
   vector_t defalutJointPos_;
+  // contact_flag_t measuredContactFlag_{true, true};
 };
 
 class humanoidCheaterController : public humanoidController {

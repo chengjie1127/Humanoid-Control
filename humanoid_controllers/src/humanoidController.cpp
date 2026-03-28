@@ -42,6 +42,10 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   bool verbose = false;
   loadData::loadCppDataType(taskFile, "humanoid_interface.verbose", verbose);
 
+  contactSub_ = controllerNh_->create_subscription<std_msgs::msg::Float32MultiArray>(
+      "/foot_contact_flags", 10, std::bind(&humanoidController::contactCallback, this, std::placeholders::_1));
+
+
   setupHumanoidInterface(taskFile, urdfFile, referenceFile, verbose);
   setupMpc();
   setupMrt();
@@ -119,7 +123,8 @@ void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr
 void humanoidController::starting(const rclcpp::Time& time) {
   // Initial state
   currentObservation_.state = vector_t::Zero(HumanoidInterface_->getCentroidalModelInfo().stateDim);
-  currentObservation_.state(8) = 0.976;
+  // currentObservation_.state(8) = 0.976;
+  currentObservation_.state(8) = 0.759;
   currentObservation_.state.segment(6 + 6, jointNum_) = defalutJointPos_;
 
   updateStateEstimation(time, rclcpp::Duration::from_seconds(0.002));
@@ -230,7 +235,8 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
     jointVel = jointVel_;
   //TODO: get contactFlag from hardware interface
   //暂时用plannedMode_代替，需要在接触传感器可靠之后修改为stateEstimate_->getMode()
-  contactFlag = modeNumber2StanceLeg(plannedMode_);
+  // contactFlag = modeNumber2StanceLeg(plannedMode_);
+  contactFlag = measuredContactFlag_;
 
   quat = quat_;
   angularVel = angularVel_;
@@ -249,7 +255,8 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   currentObservation_.state(9) = yawLast + angles::shortest_angular_distance(yawLast, currentObservation_.state(9));
   //  currentObservation_.mode = stateEstimate_->getMode();
   //TODO: 暂时用plannedMode_代替，需要在接触传感器可靠之后修改为stateEstimate_->getMode()
-  currentObservation_.mode =  plannedMode_;
+  // currentObservation_.mode =  plannedMode_;
+  currentObservation_.mode = stateEstimate_->getMode();
 }
 
 humanoidController::~humanoidController() {
@@ -328,6 +335,13 @@ void humanoidController::setupStateEstimate(const std::string& taskFile, bool ve
 void humanoidCheaterController::setupStateEstimate(const std::string& /*taskFile*/, bool /*verbose*/) {
   stateEstimate_ = std::make_shared<FromTopicStateEstimate>(HumanoidInterface_->getPinocchioInterface(),
                                                             HumanoidInterface_->getCentroidalModelInfo(), *eeKinematicsPtr_, controllerNh_);
+}
+
+void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg) {
+    if (msg->data.size() >= 2) {
+        measuredContactFlag_[0] = msg->data[0] > 0.5;
+        measuredContactFlag_[1] = msg->data[1] > 0.5;
+    }
 }
 
 }  // namespace humanoid_controller

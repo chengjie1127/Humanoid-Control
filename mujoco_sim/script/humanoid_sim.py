@@ -44,6 +44,13 @@ class HumanoidSim(MuJoCoBase):
     self.pubImu = self.node.create_publisher(Imu, '/imu', 10)
     self.pubRealTorque = self.node.create_publisher(Float32MultiArray, '/realTorque', 10)
 
+    self.pubFootContact = self.node.create_publisher(Float32MultiArray, '/foot_contact_flags', 10)
+    
+    # 【新增】：提前获取地面和左右脚连杆的 ID
+    self._ground_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'ground')
+    self._left_foot_body_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, 'left_ankle_roll_link')
+    self._right_foot_body_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, 'right_ankle_roll_link')
+
     self.node.create_subscription(Float32MultiArray, "/targetTorque", self.targetTorqueCallback, 10) 
     self.node.create_subscription(Float32MultiArray, "/targetPos", self.targetPosCallback, 10) 
     self.node.create_subscription(Float32MultiArray, "/targetVel", self.targetVelCallback, 10)
@@ -126,6 +133,12 @@ class HumanoidSim(MuJoCoBase):
           jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
           self.pubJoints.publish(jointsPosVel)
+
+          # * Publish Foot Contact
+          footContact = Float32MultiArray()
+          footContact.data = self._compute_foot_contact_flags().tolist()
+          self.pubFootContact.publish(footContact)
+
           # * Publish body pose
           bodyOdom = Odometry()
           # pos = self.data.sensor('BodyPos').data.copy()
@@ -262,7 +275,7 @@ class HumanoidSim(MuJoCoBase):
           bodyImu.angular_velocity_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
           bodyImu.linear_acceleration_covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
           self.pubImu.publish(bodyImu)
-
+          
           publish_time = self.data.time
 
       if (self.data.time - torque_publish_time >= 1.0 / 40.0):
@@ -422,6 +435,29 @@ class HumanoidSim(MuJoCoBase):
       glfw.poll_events()
 
     glfw.terminate()
+
+  def _compute_foot_contact_flags(self):
+    left_contact = 0.0
+    right_contact = 0.0
+    for contact_index in range(self.data.ncon):
+      contact = self.data.contact[contact_index]
+      geom1 = int(contact.geom1)
+      geom2 = int(contact.geom2)
+
+      if geom1 == self._ground_geom_id:
+        other_geom = geom2
+      elif geom2 == self._ground_geom_id:
+        other_geom = geom1
+      else:
+        continue
+
+      body_id = self.model.geom_bodyid[other_geom]
+      if body_id == self._left_foot_body_id:
+        left_contact = 1.0
+      elif body_id == self._right_foot_body_id:
+        right_contact = 1.0
+
+    return np.array([left_contact, right_contact], dtype=np.float64)
 
 def main(args=None):
     # ros init
