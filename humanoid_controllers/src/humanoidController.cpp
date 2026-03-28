@@ -21,6 +21,7 @@
 #include <humanoid_estimation/FromTopiceEstimate.h>
 #include <humanoid_estimation/LinearKalmanFilter.h>
 #include <humanoid_wbc/WeightedWbc.h>
+#include <chrono>
 
 
 
@@ -100,6 +101,7 @@ void humanoidController::jointStateCallback(const std_msgs::msg::Float32MultiArr
       jointPos_(i) = msg->data[i];
       jointVel_(i) = msg->data[i + jointNum_];
   }
+  jointStateReceived_.store(true, std::memory_order_relaxed);
 }
 
 void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg) {
@@ -118,9 +120,28 @@ void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr
     linearAccelCovariance_ << msg->linear_acceleration_covariance[0], msg->linear_acceleration_covariance[1], msg->linear_acceleration_covariance[2],
             msg->linear_acceleration_covariance[3], msg->linear_acceleration_covariance[4], msg->linear_acceleration_covariance[5],
             msg->linear_acceleration_covariance[6], msg->linear_acceleration_covariance[7], msg->linear_acceleration_covariance[8];
+    imuReceived_.store(true, std::memory_order_relaxed);
 }
 
 void humanoidController::starting(const rclcpp::Time& time) {
+  auto sensorsReady = [this]() {
+    return jointStateReceived_.load(std::memory_order_relaxed) && imuReceived_.load(std::memory_order_relaxed) &&
+           contactReceived_.load(std::memory_order_relaxed);
+  };
+  const auto waitStart = std::chrono::steady_clock::now();
+  constexpr auto sensorWaitTimeout = std::chrono::seconds(5);
+  while (rclcpp::ok() && !sensorsReady()) {
+    rclcpp::spin_some(controllerNh_);
+    rclcpp::sleep_for(std::chrono::milliseconds(2));
+    if (std::chrono::steady_clock::now() - waitStart > sensorWaitTimeout) {
+      RCLCPP_WARN(controllerNh_->get_logger(),
+                  "Sensor startup gate timed out (joint=%d, imu=%d, contact=%d). Proceeding with current data.",
+                  jointStateReceived_.load(std::memory_order_relaxed), imuReceived_.load(std::memory_order_relaxed),
+                  contactReceived_.load(std::memory_order_relaxed));
+      break;
+    }
+  }
+
   // Initial state
   currentObservation_.state = vector_t::Zero(HumanoidInterface_->getCentroidalModelInfo().stateDim);
   // currentObservation_.state(8) = 0.976;
@@ -354,6 +375,7 @@ void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray:
         rawContactFlag_[2] = left_contact;
         rawContactFlag_[3] = right_contact;
     }
+      contactReceived_.store(true, std::memory_order_relaxed);
 }
 
     void humanoidController::updateMeasuredContactFlag(scalar_t dt) {

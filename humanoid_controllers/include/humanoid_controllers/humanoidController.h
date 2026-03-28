@@ -22,6 +22,7 @@
 #include <std_msgs/msg/bool.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <ocs2_msgs/msg/mpc_observation.hpp>
+#include <atomic>
 #include <mutex>
 
 namespace humanoid_controller{
@@ -89,6 +90,9 @@ class humanoidController {
   scalar_t contactDebounceTime_ = 0.01;
   scalar_t contactMinHoldTime_ = 0.03;
   std::mutex contactMutex_;
+  std::atomic_bool jointStateReceived_{false};
+  std::atomic_bool imuReceived_{false};
+  std::atomic_bool contactReceived_{false};
 
   // Node Handle
   std::shared_ptr<rclcpp::Node> controllerNh_;
