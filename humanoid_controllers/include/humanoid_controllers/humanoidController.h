@@ -80,7 +80,7 @@ class humanoidController {
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr jointPosVelSub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr contactSub_;
-  ocs2::humanoid::contact_flag_t measuredContactFlag_{true, true};
+  ocs2::humanoid::contact_flag_t measuredContactFlag_{true, true, true, true};
 
   // Node Handle
   std::shared_ptr<rclcpp::Node> controllerNh_;

@@ -165,7 +165,8 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
   currentObservation_.input = optimizedInput;
 
   wbcTimer_.startTimer();
-  vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
+  // vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
+  vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, currentObservation_.mode, period.seconds());
   wbcTimer_.endTimer();
 
   const vector_t& torque = x.tail(jointNum_);
@@ -339,8 +340,15 @@ void humanoidCheaterController::setupStateEstimate(const std::string& /*taskFile
 
 void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg) {
     if (msg->data.size() >= 2) {
-        measuredContactFlag_[0] = msg->data[0] > 0.5;
-        measuredContactFlag_[1] = msg->data[1] > 0.5;
+        bool left_contact = msg->data[0] > 0.5;
+        bool right_contact = msg->data[1] > 0.5;
+        
+        // 强制把 2维映射到 4维：只要脚踩地，就认为脚尖和脚跟都踩实了
+        // 假设索引顺序是：[0]左脚尖, [1]右脚尖, [2]左脚跟, [3]右脚跟 (具体视 Types.h 而定，通常全铺满最稳)
+        measuredContactFlag_[0] = left_contact;
+        measuredContactFlag_[1] = right_contact;
+        measuredContactFlag_[2] = left_contact;
+        measuredContactFlag_[3] = right_contact;
     }
 }
 
