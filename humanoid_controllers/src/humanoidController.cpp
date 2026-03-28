@@ -180,15 +180,13 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
 
   // Evaluate the current policy
   vector_t optimizedState, optimizedInput;
-  // mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
-  mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, currentObservation_.mode);
+  mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
 
   // Whole body control
   currentObservation_.input = optimizedInput;
 
   wbcTimer_.startTimer();
-  // vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
-  vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, currentObservation_.mode, period.seconds());
+  vector_t x = wbc_->update(optimizedState, optimizedInput, measuredRbdState_, plannedMode_, period.seconds());
   wbcTimer_.endTimer();
 
   const vector_t& torque = x.tail(jointNum_);
@@ -278,10 +276,8 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   scalar_t yawLast = currentObservation_.state(9);
   currentObservation_.state = rbdConversions_->computeCentroidalStateFromRbdModel(measuredRbdState_);
   currentObservation_.state(9) = yawLast + angles::shortest_angular_distance(yawLast, currentObservation_.state(9));
-  //  currentObservation_.mode = stateEstimate_->getMode();
-  //TODO: 暂时用plannedMode_代替，需要在接触传感器可靠之后修改为stateEstimate_->getMode()
-  // currentObservation_.mode =  plannedMode_;
-  currentObservation_.mode = stateEstimate_->getMode();
+  // Keep MPC/WBC mode consistent with the planned gait schedule.
+  currentObservation_.mode = plannedMode_;
 }
 
 humanoidController::~humanoidController() {
@@ -374,8 +370,8 @@ void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray:
         rawContactFlag_[1] = right_contact;
         rawContactFlag_[2] = left_contact;
         rawContactFlag_[3] = right_contact;
+        contactReceived_.store(true, std::memory_order_relaxed);
     }
-      contactReceived_.store(true, std::memory_order_relaxed);
 }
 
     void humanoidController::updateMeasuredContactFlag(scalar_t dt) {

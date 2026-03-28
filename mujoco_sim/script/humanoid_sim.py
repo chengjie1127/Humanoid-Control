@@ -296,6 +296,9 @@ class HumanoidSim(MuJoCoBase):
         jointsPosVel.data = np.concatenate((qp,qv)).tolist()
 
         self.pubJoints.publish(jointsPosVel)
+        footContact = Float32MultiArray()
+        footContact.data = self._compute_foot_contact_flags().tolist()
+        self.pubFootContact.publish(footContact)
         # * Publish body pose
         bodyOdom = Odometry()
         # pos = self.data.sensor('BodyPos').data.copy()
