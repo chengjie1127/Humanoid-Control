@@ -44,6 +44,7 @@ class humanoidController {
   virtual void setupMpc();
   virtual void setupMrt();
   virtual void setupStateEstimate(const std::string& taskFile, bool verbose);
+  void updateMeasuredContactFlag(scalar_t dt);
 
   void jointStateCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg);
   void ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg);
@@ -80,7 +81,12 @@ class humanoidController {
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr jointPosVelSub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr contactSub_;
+  ocs2::humanoid::contact_flag_t rawContactFlag_{true, true, true, true};
   ocs2::humanoid::contact_flag_t measuredContactFlag_{true, true, true, true};
+  feet_array_t<scalar_t> contactCandidateDuration_{0.0, 0.0, 0.0, 0.0};
+  feet_array_t<scalar_t> contactTimeSinceSwitch_{1.0, 1.0, 1.0, 1.0};
+  scalar_t contactDebounceTime_ = 0.01;
+  scalar_t contactMinHoldTime_ = 0.03;
 
   // Node Handle
   std::shared_ptr<rclcpp::Node> controllerNh_;

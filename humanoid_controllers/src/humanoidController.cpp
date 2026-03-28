@@ -159,7 +159,8 @@ void humanoidController::update(const rclcpp::Time& time, const rclcpp::Duration
 
   // Evaluate the current policy
   vector_t optimizedState, optimizedInput;
-  mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
+  // mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, plannedMode_);
+  mpcMrtInterface_->evaluatePolicy(currentObservation_.time, currentObservation_.state, optimizedState, optimizedInput, currentObservation_.mode);
 
   // Whole body control
   currentObservation_.input = optimizedInput;
@@ -233,7 +234,9 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
 
 
   jointPos = jointPos_;
-    jointVel = jointVel_;
+  jointVel = jointVel_;
+  const scalar_t dt = period.seconds() > 1e-6 ? period.seconds() : 1e-6;
+  updateMeasuredContactFlag(dt);
   //TODO: get contactFlag from hardware interface
   //暂时用plannedMode_代替，需要在接触传感器可靠之后修改为stateEstimate_->getMode()
   // contactFlag = modeNumber2StanceLeg(plannedMode_);
@@ -345,11 +348,29 @@ void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray:
         
         // 强制把 2维映射到 4维：只要脚踩地，就认为脚尖和脚跟都踩实了
         // 假设索引顺序是：[0]左脚尖, [1]右脚尖, [2]左脚跟, [3]右脚跟 (具体视 Types.h 而定，通常全铺满最稳)
-        measuredContactFlag_[0] = left_contact;
-        measuredContactFlag_[1] = right_contact;
-        measuredContactFlag_[2] = left_contact;
-        measuredContactFlag_[3] = right_contact;
+        rawContactFlag_[0] = left_contact;
+        rawContactFlag_[1] = right_contact;
+        rawContactFlag_[2] = left_contact;
+        rawContactFlag_[3] = right_contact;
     }
 }
+
+    void humanoidController::updateMeasuredContactFlag(scalar_t dt) {
+      for (size_t i = 0; i < measuredContactFlag_.size(); ++i) {
+        contactTimeSinceSwitch_[i] += dt;
+
+        if (rawContactFlag_[i] == measuredContactFlag_[i]) {
+          contactCandidateDuration_[i] = 0.0;
+          continue;
+        }
+
+        contactCandidateDuration_[i] += dt;
+        if (contactCandidateDuration_[i] >= contactDebounceTime_ && contactTimeSinceSwitch_[i] >= contactMinHoldTime_) {
+          measuredContactFlag_[i] = rawContactFlag_[i];
+          contactCandidateDuration_[i] = 0.0;
+          contactTimeSinceSwitch_[i] = 0.0;
+        }
+      }
+    }
 
 }  // namespace humanoid_controller
