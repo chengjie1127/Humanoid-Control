@@ -3,16 +3,17 @@
 //
 
 #include "humanoid_controllers/humanoidController.h"
+#include <atomic>
 #include <thread>
 
 using Duration = std::chrono::duration<double>;
 using Clock = std::chrono::high_resolution_clock;
 
-bool pause_flag = false;
+std::atomic_bool pause_flag{false};
 
 void pauseCallback(const std_msgs::msg::Bool::ConstSharedPtr& msg){
-    pause_flag = msg->data;
-    std::cerr << "pause_flag: " << pause_flag << std::endl;
+    pause_flag.store(msg->data, std::memory_order_relaxed);
+    std::cerr << "pause_flag: " << pause_flag.load(std::memory_order_relaxed) << std::endl;
 }
 
 int main(int argc, char** argv){
@@ -41,16 +42,26 @@ int main(int argc, char** argv){
     spin_thread.detach();
 
     while(rclcpp::ok()){
-        if (!pause_flag)
-        {
-            const auto currentTime = Clock::now();
-            // Compute desired duration rounded to clock decimation
-            const Duration desiredDuration(1.0 / 500);
+        const auto currentTime = Clock::now();
+        const bool paused = pause_flag.load(std::memory_order_relaxed);
+        // Compute desired duration rounded to clock decimation
+        const Duration desiredDuration(1.0 / 500);
+        const Duration maxDuration(0.02);  // guard against pause/release and scheduler spikes
 
-            // Get change in time
-            Duration time_span = std::chrono::duration_cast<Duration>(currentTime - lastTime);
-            elapsedTime_ = rclcpp::Duration::from_seconds(time_span.count());
+        if (paused) {
+            // Keep time base synchronized while paused to avoid a huge dt on resume.
             lastTime = currentTime;
+            rclcpp::sleep_for(std::chrono::milliseconds(2));
+            continue;
+        }
+
+        // Get change in time
+        Duration time_span = std::chrono::duration_cast<Duration>(currentTime - lastTime);
+        if (time_span > maxDuration) {
+            time_span = desiredDuration;
+        }
+        elapsedTime_ = rclcpp::Duration::from_seconds(time_span.count());
+        lastTime = currentTime;
 
             // Check cycle time for excess delay
 //            const double cycle_time_error = (elapsedTime_ - rclcpp::Duration::from_seconds(desiredDuration.count())).seconds();
@@ -62,12 +73,11 @@ int main(int argc, char** argv){
 
             // Control
             // let the controller compute the new command (via the controller manager)
-            controller.update(nh->now(), elapsedTime_);
+        controller.update(nh->now(), elapsedTime_);
 
             // Sleep
-            const auto sleepTill = currentTime + std::chrono::duration_cast<Clock::duration>(desiredDuration);
-            std::this_thread::sleep_until(sleepTill);
-        }
+        const auto sleepTill = currentTime + std::chrono::duration_cast<Clock::duration>(desiredDuration);
+        std::this_thread::sleep_until(sleepTill);
     }
 
 
