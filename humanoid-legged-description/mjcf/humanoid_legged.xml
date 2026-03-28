@@ -4,7 +4,7 @@
     <option timestep="0.001" iterations="50" solver="PGS" gravity="0 0 -9.81" noslip_iterations="20">
     </option>
     <default>
-        <geom contype="1" conaffinity="1" condim="4" friction="1.0 1.0 0.01" solref="0.005 1"/>
+        <geom contype="1" conaffinity="1" condim="1" solref="0.005 1"/>
     </default>
     <visual>
         <quality shadowsize="4096"/>
@@ -55,7 +55,7 @@
     </asset>
     <worldbody>
         <light directional="false" cutoff="60" exponent="1" diffuse=".5 .5 .5" specular=".1 .1 .1" pos="0.5 0.1 0.8" dir="-0.5 -0.1 -0.8"/>
-        <geom name="ground" type="plane" size="0 0 1" pos="0.001 0 0" quat="1 0 0 0" material="matplane" condim="4" contype="15" conaffinity="1" friction="1.2 1.2 0.001"/>
+        <geom name="ground" type="plane" size="0 0 1" pos="0.001 0 0" quat="1 0 0 0" material="matplane" condim="3" contype="15" conaffinity='0' friction="1.2 0.8 0.8"/>
         <body name="pelvis" pos="0 0 0.793">
             <freejoint/>
             <inertial pos="0 0 -0.07605" quat="1 0 -0.000399148 0" mass="3.813" diaginertia="0.010549 0.0093089 0.0079184"/>
@@ -172,8 +172,6 @@
                                     <joint name="left_ankle_roll_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.2618 0.2618" damping="0.01" frictionloss="0.01" armature="0.01"/>
                                     <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.2 0.2 0.2 1" mesh="left_ankle_roll_link"/>
                                     <geom name="left_foot_sole" type="box" size="0.085 0.035 0.005" pos="0.035 0 -0.03" friction="1.2 1.2 0.001" rgba="0.2 0.2 0.2 1"/>
-                                    <geom name="left_foot_toe_contact" type="sphere" size="0.01" pos="0.12 0 -0.025" rgba="1 0 0 1" friction="1 0.005 0.0001"/>
-                                    <geom name="left_foot_heel_contact" type="sphere" size="0.01" pos="-0.05 0 -0.025" rgba="1 0 0 1" friction="1 0.005 0.0001"/>
                                 </body>
                             </body>
                         </body>
@@ -207,8 +205,6 @@
                                     <joint name="right_ankle_roll_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.2618 0.2618" damping="0.01" frictionloss="0.01" armature="0.01"/>
                                     <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.2 0.2 0.2 1" mesh="right_ankle_roll_link"/>
                                     <geom name="right_foot_sole" type="box" size="0.085 0.035 0.005" pos="0.035 0 -0.03" friction="1.2 1.2 0.001" rgba="0.2 0.2 0.2 1"/>
-                                    <geom name="right_foot_toe_contact" type="sphere" size="0.01" pos="0.12 0 -0.025" rgba="1 0 0 1" friction="1 0.005 0.0001"/>
-                                    <geom name="right_foot_heel_contact" type="sphere" size="0.01" pos="-0.05 0 -0.025" rgba="1 0 0 1" friction="1 0.005 0.0001"/>
                                 </body>
                             </body>
                         </body>

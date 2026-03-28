@@ -62,7 +62,7 @@ bool humanoidController::init(std::shared_ptr<rclcpp::Node> controller_nh) {
   //TODO: setup hardware controller interface
   //create a ROS subscriber to receive the joint pos and vel
     jointPos_ = vector_t::Zero(jointNum_);
-    jointPos_ << 0.0, 0.0, 0.37, 0.90, 0.53, 0, 0.0, 0.0, 0.37, 0.90, 0.53, 0;
+    jointPos_ = defalutJointPos_;
     jointVel_ = vector_t::Zero(jointNum_);
     quat_ = Eigen::Quaternion<scalar_t>(1, 0, 0, 0);
   jointPosVelSub_ = controllerNh_->create_subscription<std_msgs::msg::Float32MultiArray>("/jointsPosVel", 10, std::bind(&humanoidController::jointStateCallback, this, std::placeholders::_1));
