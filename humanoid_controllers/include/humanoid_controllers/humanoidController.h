@@ -22,6 +22,7 @@
 #include <std_msgs/msg/bool.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <ocs2_msgs/msg/mpc_observation.hpp>
+#include <mutex>
 
 namespace humanoid_controller{
 using namespace ocs2;
@@ -87,6 +88,7 @@ class humanoidController {
   feet_array_t<scalar_t> contactTimeSinceSwitch_{1.0, 1.0, 1.0, 1.0};
   scalar_t contactDebounceTime_ = 0.01;
   scalar_t contactMinHoldTime_ = 0.03;
+  std::mutex contactMutex_;
 
   // Node Handle
   std::shared_ptr<rclcpp::Node> controllerNh_;

@@ -348,6 +348,7 @@ void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray:
         
         // 强制把 2维映射到 4维：只要脚踩地，就认为脚尖和脚跟都踩实了
         // 假设索引顺序是：[0]左脚尖, [1]右脚尖, [2]左脚跟, [3]右脚跟 (具体视 Types.h 而定，通常全铺满最稳)
+        std::lock_guard<std::mutex> lock(contactMutex_);
         rawContactFlag_[0] = left_contact;
         rawContactFlag_[1] = right_contact;
         rawContactFlag_[2] = left_contact;
@@ -356,17 +357,23 @@ void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray:
 }
 
     void humanoidController::updateMeasuredContactFlag(scalar_t dt) {
+      contact_flag_t rawContactSnapshot;
+      {
+        std::lock_guard<std::mutex> lock(contactMutex_);
+        rawContactSnapshot = rawContactFlag_;
+      }
+
       for (size_t i = 0; i < measuredContactFlag_.size(); ++i) {
         contactTimeSinceSwitch_[i] += dt;
 
-        if (rawContactFlag_[i] == measuredContactFlag_[i]) {
+        if (rawContactSnapshot[i] == measuredContactFlag_[i]) {
           contactCandidateDuration_[i] = 0.0;
           continue;
         }
 
         contactCandidateDuration_[i] += dt;
         if (contactCandidateDuration_[i] >= contactDebounceTime_ && contactTimeSinceSwitch_[i] >= contactMinHoldTime_) {
-          measuredContactFlag_[i] = rawContactFlag_[i];
+          measuredContactFlag_[i] = rawContactSnapshot[i];
           contactCandidateDuration_[i] = 0.0;
           contactTimeSinceSwitch_[i] = 0.0;
         }
