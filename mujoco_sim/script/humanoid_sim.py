@@ -46,10 +46,11 @@ class HumanoidSim(MuJoCoBase):
 
     self.pubFootContact = self.node.create_publisher(Float32MultiArray, '/foot_contact_flags', 10)
     
-    # 【新增】：提前获取地面和左右脚连杆的 ID
+    # Physical contacts come from sole geoms only. We still publish 4D flags
+    # for controller compatibility by mirroring each foot-level contact to toe/heel.
     self._ground_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'ground')
-    self._left_foot_body_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, 'left_ankle_roll_link')
-    self._right_foot_body_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, 'right_ankle_roll_link')
+    self._left_sole_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'left_foot_sole')
+    self._right_sole_geom_id = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_GEOM, 'right_foot_sole')
 
     self.node.create_subscription(Float32MultiArray, "/targetTorque", self.targetTorqueCallback, 10) 
     self.node.create_subscription(Float32MultiArray, "/targetPos", self.targetPosCallback, 10) 
@@ -454,13 +455,19 @@ class HumanoidSim(MuJoCoBase):
       else:
         continue
 
-      body_id = self.model.geom_bodyid[other_geom]
-      if body_id == self._left_foot_body_id:
+      if other_geom == self._left_sole_geom_id:
         left_contact = 1.0
-      elif body_id == self._right_foot_body_id:
+      elif other_geom == self._right_sole_geom_id:
         right_contact = 1.0
 
-    return np.array([left_contact, right_contact], dtype=np.float64)
+    # Keep 4D message order: [left_toe, right_toe, left_heel, right_heel].
+    # With sole-only collision, toe/heel channels mirror the same foot contact.
+    return np.array([
+        left_contact,
+        right_contact,
+        left_contact,
+        right_contact,
+    ], dtype=np.float64)
 
 def main(args=None):
     # ros init

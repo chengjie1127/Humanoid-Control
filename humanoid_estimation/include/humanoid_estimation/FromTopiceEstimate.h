@@ -11,6 +11,7 @@ at www.bridgedp.com.
 
 #include "humanoid_estimation/StateEstimateBase.h"
 
+#include <atomic>
 #include <realtime_tools/realtime_buffer.hpp>
 
 #pragma once
@@ -30,12 +31,17 @@ public:
                  const matrix3_t& angularVelCovariance, const matrix3_t& linearAccelCovariance) override{};
 
   vector_t update(const rclcpp::Time& time, const rclcpp::Duration& period) override;
+  bool isReady() const override
+  {
+    return odomReceived_.load(std::memory_order_relaxed);
+  }
 
 private:
   void callback(const nav_msgs::msg::Odometry::SharedPtr msg);
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_;
   realtime_tools::RealtimeBuffer<nav_msgs::msg::Odometry> buffer_;
+  std::atomic_bool odomReceived_{false};
 };
 
 }  // namespace humanoid

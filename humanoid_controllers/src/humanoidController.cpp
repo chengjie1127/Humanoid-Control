@@ -126,7 +126,7 @@ void humanoidController::ImuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr
 void humanoidController::starting(const rclcpp::Time& time) {
   auto sensorsReady = [this]() {
     return jointStateReceived_.load(std::memory_order_relaxed) && imuReceived_.load(std::memory_order_relaxed) &&
-           contactReceived_.load(std::memory_order_relaxed);
+           contactReceived_.load(std::memory_order_relaxed) && stateEstimate_->isReady();
   };
   const auto waitStart = std::chrono::steady_clock::now();
   constexpr auto sensorWaitTimeout = std::chrono::seconds(5);
@@ -135,18 +135,15 @@ void humanoidController::starting(const rclcpp::Time& time) {
     rclcpp::sleep_for(std::chrono::milliseconds(2));
     if (std::chrono::steady_clock::now() - waitStart > sensorWaitTimeout) {
       RCLCPP_WARN(controllerNh_->get_logger(),
-                  "Sensor startup gate timed out (joint=%d, imu=%d, contact=%d). Proceeding with current data.",
+                  "Sensor startup gate timed out (joint=%d, imu=%d, contact=%d, state=%d). Proceeding with current data.",
                   jointStateReceived_.load(std::memory_order_relaxed), imuReceived_.load(std::memory_order_relaxed),
-                  contactReceived_.load(std::memory_order_relaxed));
+                  contactReceived_.load(std::memory_order_relaxed), stateEstimate_->isReady());
       break;
     }
   }
 
   // Initial state
-  currentObservation_.state = vector_t::Zero(HumanoidInterface_->getCentroidalModelInfo().stateDim);
-  // currentObservation_.state(8) = 0.976;
-  currentObservation_.state(8) = 0.759;
-  currentObservation_.state.segment(6 + 6, jointNum_) = defalutJointPos_;
+  currentObservation_.state = HumanoidInterface_->getInitialState();
 
   updateStateEstimation(time, rclcpp::Duration::from_seconds(0.002));
   currentObservation_.input.setZero(HumanoidInterface_->getCentroidalModelInfo().inputDim);
@@ -277,6 +274,8 @@ void humanoidController::updateStateEstimation(const rclcpp::Time& time, const r
   currentObservation_.state = rbdConversions_->computeCentroidalStateFromRbdModel(measuredRbdState_);
   currentObservation_.state(9) = yawLast + angles::shortest_angular_distance(yawLast, currentObservation_.state(9));
   // Keep MPC/WBC mode consistent with the planned gait schedule.
+  // The raw 4-point toe/heel contact can be partially active within one foot,
+  // while the internal gait mode is foot-level (left/right stance).
   currentObservation_.mode = plannedMode_;
 }
 
@@ -359,13 +358,21 @@ void humanoidCheaterController::setupStateEstimate(const std::string& /*taskFile
 }
 
 void humanoidController::contactCallback(const std_msgs::msg::Float32MultiArray::ConstSharedPtr& msg) {
+    std::lock_guard<std::mutex> lock(contactMutex_);
+    if (msg->data.size() >= 4) {
+        rawContactFlag_[0] = msg->data[0] > 0.5;  // left toe
+        rawContactFlag_[1] = msg->data[1] > 0.5;  // right toe
+        rawContactFlag_[2] = msg->data[2] > 0.5;  // left heel
+        rawContactFlag_[3] = msg->data[3] > 0.5;  // right heel
+        contactReceived_.store(true, std::memory_order_relaxed);
+        return;
+    }
+
     if (msg->data.size() >= 2) {
-        bool left_contact = msg->data[0] > 0.5;
-        bool right_contact = msg->data[1] > 0.5;
-        
-        // 强制把 2维映射到 4维：只要脚踩地，就认为脚尖和脚跟都踩实了
-        // 假设索引顺序是：[0]左脚尖, [1]右脚尖, [2]左脚跟, [3]右脚跟 (具体视 Types.h 而定，通常全铺满最稳)
-        std::lock_guard<std::mutex> lock(contactMutex_);
+        const bool left_contact = msg->data[0] > 0.5;
+        const bool right_contact = msg->data[1] > 0.5;
+
+        // Backward-compatible fallback for older 2D foot-level publishers.
         rawContactFlag_[0] = left_contact;
         rawContactFlag_[1] = right_contact;
         rawContactFlag_[2] = left_contact;

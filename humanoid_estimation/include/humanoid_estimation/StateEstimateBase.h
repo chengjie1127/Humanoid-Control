@@ -49,6 +49,10 @@ public:
                          const matrix3_t& angularVelCovariance, const matrix3_t& linearAccelCovariance);
 
   virtual vector_t update(const rclcpp::Time& time, const rclcpp::Duration& period) = 0;
+  virtual bool isReady() const
+  {
+    return true;
+  }
 
   size_t getMode()
   {

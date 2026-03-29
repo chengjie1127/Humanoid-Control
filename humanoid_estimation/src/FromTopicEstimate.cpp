@@ -28,6 +28,7 @@ FromTopicStateEstimate::FromTopicStateEstimate(PinocchioInterface pinocchioInter
 void FromTopicStateEstimate::callback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
   buffer_.writeFromNonRT(*msg);
+  odomReceived_.store(true, std::memory_order_relaxed);
 }
 
 vector_t FromTopicStateEstimate::update(const rclcpp::Time& /*time*/, const rclcpp::Duration& /*period*/)
