@@ -56,6 +56,23 @@ namespace humanoid {
 
 class HumanoidInterface final : public RobotInterface {
  public:
+  struct JointSoftLimitSettings {
+    bool enabled = false;
+    scalar_t hipRollMin = -0.35;
+    scalar_t hipRollMax = 0.35;
+    scalar_t hipYawMin = -0.35;
+    scalar_t hipYawMax = 0.35;
+    scalar_t kneeMin = 0.0;
+    scalar_t kneeMax = 1.4;
+    scalar_t ankleRollMin = -0.35;
+    scalar_t ankleRollMax = 0.35;
+    scalar_t hipRollWeight = 30.0;
+    scalar_t hipYawWeight = 30.0;
+    scalar_t kneeWeight = 50.0;
+    scalar_t ankleRollWeight = 30.0;
+    scalar_t delta = 0.0;
+  };
+
   /**
    * Constructor
    *
@@ -100,9 +117,11 @@ class HumanoidInterface final : public RobotInterface {
   matrix_t initializeInputCostWeight(const std::string& taskFile, const CentroidalModelInfo& info);
 
   std::pair<scalar_t, RelaxedBarrierPenalty::Config> loadFrictionConeSettings(const std::string& taskFile, bool verbose) const;
+  JointSoftLimitSettings loadJointSoftLimitSettings(const std::string& taskFile, bool verbose) const;
   std::unique_ptr<StateInputConstraint> getFrictionConeConstraint(size_t contactPointIndex, scalar_t frictionCoefficient);
   std::unique_ptr<StateInputCost> getFrictionConeSoftConstraint(size_t contactPointIndex, scalar_t frictionCoefficient,
                                                                 const RelaxedBarrierPenalty::Config& barrierPenaltyConfig);
+  std::unique_ptr<StateCost> getJointSoftLimitConstraint(const JointSoftLimitSettings& settings) const;
   std::unique_ptr<StateInputConstraint> getZeroForceConstraint(size_t contactPointIndex);
   std::unique_ptr<StateInputConstraint> getZeroVelocityConstraint(const EndEffectorKinematics<scalar_t>& eeKinematics,
                                                                   size_t contactPointIndex, bool useAnalyticalGradients);

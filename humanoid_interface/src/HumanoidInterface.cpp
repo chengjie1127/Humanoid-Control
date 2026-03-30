@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 #include <pinocchio/fwd.hpp>  // forward declarations must be included first.
 
@@ -41,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_centroidal_model/AccessHelperFunctions.h>
 #include <ocs2_centroidal_model/CentroidalModelPinocchioMapping.h>
 #include <ocs2_centroidal_model/ModelHelperFunctions.h>
+#include <ocs2_core/constraint/LinearStateConstraint.h>
 #include <ocs2_core/misc/Display.h>
 #include <ocs2_core/misc/LoadStdVectorOfPair.h>
 #include <ocs2_core/soft_constraint/StateInputSoftConstraint.h>
@@ -151,6 +153,11 @@ void HumanoidInterface::setupOptimalControlProblem(const std::string& taskFile, 
 
   // Cost terms
   problemPtr_->costPtr->add("baseTrackingCost", getBaseTrackingCost(taskFile, centroidalModelInfo_, false));
+
+  const auto jointSoftLimitSettings = loadJointSoftLimitSettings(taskFile, verbose);
+  if (jointSoftLimitSettings.enabled) {
+    problemPtr_->stateSoftConstraintPtr->add("jointSoftLimit", getJointSoftLimitConstraint(jointSoftLimitSettings));
+  }
 
   // Constraint terms
   // friction cone settings
@@ -327,6 +334,76 @@ std::pair<scalar_t, RelaxedBarrierPenalty::Config> HumanoidInterface::loadFricti
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
+HumanoidInterface::JointSoftLimitSettings HumanoidInterface::loadJointSoftLimitSettings(const std::string& taskFile,
+                                                                                         bool verbose) const {
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(taskFile, pt);
+
+  JointSoftLimitSettings settings;
+  const std::string prefix = "jointSoftLimit.";
+
+  if (const auto value = pt.get_optional<bool>(prefix + "enabled")) {
+    settings.enabled = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "kneeMin")) {
+    settings.kneeMin = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "hipRollMin")) {
+    settings.hipRollMin = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "hipRollMax")) {
+    settings.hipRollMax = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "hipYawMin")) {
+    settings.hipYawMin = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "hipYawMax")) {
+    settings.hipYawMax = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "kneeMax")) {
+    settings.kneeMax = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "ankleRollMin")) {
+    settings.ankleRollMin = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "ankleRollMax")) {
+    settings.ankleRollMax = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "kneeWeight")) {
+    settings.kneeWeight = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "hipRollWeight")) {
+    settings.hipRollWeight = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "hipYawWeight")) {
+    settings.hipYawWeight = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "ankleRollWeight")) {
+    settings.ankleRollWeight = *value;
+  }
+  if (const auto value = pt.get_optional<scalar_t>(prefix + "delta")) {
+    settings.delta = *value;
+  }
+
+  if (verbose && settings.enabled) {
+    std::cerr << "\n #### Joint Soft Limits: ";
+    std::cerr << "\n #### =============================================================================\n";
+    std::cerr << "hip roll range: [" << settings.hipRollMin << ", " << settings.hipRollMax << "]\n";
+    std::cerr << "hip yaw range: [" << settings.hipYawMin << ", " << settings.hipYawMax << "]\n";
+    std::cerr << "knee range: [" << settings.kneeMin << ", " << settings.kneeMax << "]\n";
+    std::cerr << "ankle roll range: [" << settings.ankleRollMin << ", " << settings.ankleRollMax << "]\n";
+    std::cerr << "hipRollWeight: " << settings.hipRollWeight << " | hipYawWeight: " << settings.hipYawWeight
+              << " | kneeWeight: " << settings.kneeWeight << " | ankleRollWeight: " << settings.ankleRollWeight
+              << " | delta: " << settings.delta << "\n";
+    std::cerr << " #### =============================================================================\n";
+  }
+
+  return settings;
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
 std::unique_ptr<StateInputConstraint> HumanoidInterface::getFrictionConeConstraint(size_t contactPointIndex,
                                                                                       scalar_t frictionCoefficient) {
   FrictionConeConstraint::Config frictionConeConConfig(frictionCoefficient);
@@ -341,6 +418,69 @@ std::unique_ptr<StateInputCost> HumanoidInterface::getFrictionConeSoftConstraint
     size_t contactPointIndex, scalar_t frictionCoefficient, const RelaxedBarrierPenalty::Config& barrierPenaltyConfig) {
   return std::make_unique<StateInputSoftConstraint>(getFrictionConeConstraint(contactPointIndex, frictionCoefficient),
                                                     std::make_unique<RelaxedBarrierPenalty>(barrierPenaltyConfig));
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+std::unique_ptr<StateCost> HumanoidInterface::getJointSoftLimitConstraint(
+    const JointSoftLimitSettings& settings) const {
+  const auto getJointOffset = [&](const std::string& jointName) -> size_t {
+    const auto it = std::find(modelSettings_.jointNames.begin(), modelSettings_.jointNames.end(), jointName);
+    if (it == modelSettings_.jointNames.end()) {
+      throw std::runtime_error("[HumanoidInterface::getJointSoftLimitConstraint] Joint not found: " + jointName);
+    }
+    return static_cast<size_t>(std::distance(modelSettings_.jointNames.begin(), it));
+  };
+
+  const size_t jointPositionStartIndex = centroidalModelInfo_.stateDim - centroidalModelInfo_.actuatedDofNum;
+  const size_t leftHipRollIndex = jointPositionStartIndex + getJointOffset("left_hip_roll_joint");
+  const size_t rightHipRollIndex = jointPositionStartIndex + getJointOffset("right_hip_roll_joint");
+  const size_t leftHipYawIndex = jointPositionStartIndex + getJointOffset("left_hip_yaw_joint");
+  const size_t rightHipYawIndex = jointPositionStartIndex + getJointOffset("right_hip_yaw_joint");
+  const size_t leftKneeIndex = jointPositionStartIndex + getJointOffset("left_knee_joint");
+  const size_t rightKneeIndex = jointPositionStartIndex + getJointOffset("right_knee_joint");
+  const size_t leftAnkleRollIndex = jointPositionStartIndex + getJointOffset("left_ankle_roll_joint");
+  const size_t rightAnkleRollIndex = jointPositionStartIndex + getJointOffset("right_ankle_roll_joint");
+
+  constexpr size_t kNumConstraints = 16;
+  matrix_t F = matrix_t::Zero(kNumConstraints, centroidalModelInfo_.stateDim);
+  vector_t h = vector_t::Zero(kNumConstraints);
+
+  auto addJointBounds = [&](size_t startRow, size_t jointIndex, scalar_t lower, scalar_t upper) {
+    h(startRow) = -lower;
+    F(startRow, jointIndex) = 1.0;
+    h(startRow + 1) = upper;
+    F(startRow + 1, jointIndex) = -1.0;
+  };
+
+  addJointBounds(0, leftHipRollIndex, settings.hipRollMin, settings.hipRollMax);
+  addJointBounds(2, rightHipRollIndex, settings.hipRollMin, settings.hipRollMax);
+  addJointBounds(4, leftHipYawIndex, settings.hipYawMin, settings.hipYawMax);
+  addJointBounds(6, rightHipYawIndex, settings.hipYawMin, settings.hipYawMax);
+  addJointBounds(8, leftKneeIndex, settings.kneeMin, settings.kneeMax);
+  addJointBounds(10, rightKneeIndex, settings.kneeMin, settings.kneeMax);
+  addJointBounds(12, leftAnkleRollIndex, settings.ankleRollMin, settings.ankleRollMax);
+  addJointBounds(14, rightAnkleRollIndex, settings.ankleRollMin, settings.ankleRollMax);
+
+  std::vector<std::unique_ptr<PenaltyBase>> penalties;
+  penalties.reserve(kNumConstraints);
+  for (size_t i = 0; i < 4; ++i) {
+    penalties.push_back(std::make_unique<SquaredHingePenalty>(SquaredHingePenalty::Config{settings.hipRollWeight, settings.delta}));
+  }
+  for (size_t i = 0; i < 4; ++i) {
+    penalties.push_back(std::make_unique<SquaredHingePenalty>(SquaredHingePenalty::Config{settings.hipYawWeight, settings.delta}));
+  }
+  for (size_t i = 0; i < 4; ++i) {
+    penalties.push_back(std::make_unique<SquaredHingePenalty>(SquaredHingePenalty::Config{settings.kneeWeight, settings.delta}));
+  }
+  for (size_t i = 0; i < 4; ++i) {
+    penalties.push_back(
+        std::make_unique<SquaredHingePenalty>(SquaredHingePenalty::Config{settings.ankleRollWeight, settings.delta}));
+  }
+
+  auto constraint = std::make_unique<LinearStateConstraint>(std::move(h), std::move(F));
+  return std::make_unique<StateSoftConstraint>(std::move(constraint), std::move(penalties));
 }
 
 /******************************************************************************************************/
