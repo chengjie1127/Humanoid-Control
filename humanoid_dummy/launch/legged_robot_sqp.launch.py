@@ -5,8 +5,10 @@ from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitut
 from launch_ros.descriptions import ParameterValue
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+import os
 
 def generate_launch_description():
+    use_gnome_terminal = os.path.exists('/usr/bin/gnome-terminal.real') or os.path.exists('/usr/bin/gnome-terminal')
     return LaunchDescription([
         DeclareLaunchArgument('rviz', default_value='true'),
         DeclareLaunchArgument('multiplot', default_value='false'),
@@ -69,14 +71,14 @@ def generate_launch_description():
             executable='humanoid_target',
             name='humanoid_target',
             output='screen',
-            prefix='gnome-terminal --',
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
                 'urdfFile': LaunchConfiguration('urdfFile'),
                 'urdfFileOrigin': LaunchConfiguration('urdfFileOrigin'),
                 'gaitCommandFile': LaunchConfiguration('gaitCommandFile')
-            }]
+            }],
+            **({'prefix': 'gnome-terminal --'} if use_gnome_terminal else {})
         ),
         
         Node(
@@ -84,13 +86,13 @@ def generate_launch_description():
             executable='humanoid_gait_command',
             name='humanoid_gait_command',
             output='screen',
-            prefix='gnome-terminal --',
             parameters=[{
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
                 'urdfFile': LaunchConfiguration('urdfFile'),
                 'urdfFileOrigin': LaunchConfiguration('urdfFileOrigin'),
                 'gaitCommandFile': LaunchConfiguration('gaitCommandFile')
-            }]
+            }],
+            **({'prefix': 'gnome-terminal --'} if use_gnome_terminal else {})
         )
     ])
