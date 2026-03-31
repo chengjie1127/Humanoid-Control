@@ -1,58 +1,54 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, AppendEnvironmentVariable
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch_ros.descriptions import ParameterValue
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 import os
 
 def generate_launch_description():
+    use_gnome_terminal = os.path.exists('/usr/bin/gnome-terminal.real') or os.path.exists('/usr/bin/gnome-terminal')
     return LaunchDescription([
-        DeclareLaunchArgument('launch_rviz', default_value='true'),
+        DeclareLaunchArgument('rviz', default_value='true'),
+        DeclareLaunchArgument('multiplot', default_value='false'),
         DeclareLaunchArgument('taskFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/mpc/task.info'])),
         DeclareLaunchArgument('referenceFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/reference.info'])),
         DeclareLaunchArgument('urdfFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_control.urdf'])),
         DeclareLaunchArgument('urdfFileOrigin', default_value=PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'urdf/humanoid_legged_origin.urdf'])),
         DeclareLaunchArgument('gaitCommandFile', default_value=PathJoinSubstitution([FindPackageShare('humanoid_interface'), 'config/command/gait.info'])),
-        DeclareLaunchArgument('swap_cmd_vel_xy', default_value='false'),
-        
-        # Append OCS2 library paths to LD_LIBRARY_PATH so the nodes can find them at runtime
-        AppendEnvironmentVariable(
-            'LD_LIBRARY_PATH',
-            ':'.join([
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/hpipm_catkin/lib'),
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/hpp-fcl/lib'),
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_pinocchio_interface/lib'),
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_core/lib'),
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/pinocchio/lib'),
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/blasfeo_catkin/lib'),
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_msgs/lib'),
-                os.path.join(os.path.expanduser('~'), 'ocs2_ws/install/ocs2_ros_interfaces/lib')
-            ])
-        ),
-        
-        # Include RViz from humanoid-legged-description
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution([FindPackageShare('humanoid_legged_description'), 'launch', 'display.launch.py'])
-            ),
-            launch_arguments={
-                'launch_rviz': LaunchConfiguration('launch_rviz'),
-            }.items(),
+
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{
+                'robot_description': ParameterValue(Command(['cat ', LaunchConfiguration('urdfFileOrigin')]), value_type=str)
+            }]
         ),
 
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz',
+            output='screen',
+            arguments=['-d', PathJoinSubstitution([FindPackageShare('humanoid_dummy'), 'rviz/humanoid.rviz'])],
+            condition=IfCondition(LaunchConfiguration('rviz'))
+        ),
+        
         Node(
             package='humanoid_dummy',
             executable='humanoid_sqp_mpc',
             name='humanoid_sqp_mpc',
             output='screen',
             parameters=[{
+                'multiplot': LaunchConfiguration('multiplot'),
                 'taskFile': LaunchConfiguration('taskFile'),
                 'referenceFile': LaunchConfiguration('referenceFile'),
                 'urdfFile': LaunchConfiguration('urdfFile'),
                 'urdfFileOrigin': LaunchConfiguration('urdfFileOrigin'),
-                'gaitCommandFile': LaunchConfiguration('gaitCommandFile'),
-                'swap_cmd_vel_xy': LaunchConfiguration('swap_cmd_vel_xy')
+                'gaitCommandFile': LaunchConfiguration('gaitCommandFile')
             }]
         ),
         
@@ -70,12 +66,9 @@ def generate_launch_description():
             }]
         ),
         
-        # Terminal-friendly target publisher:
-        # - subscribes /cmd_vel for velocity commands
-        # - subscribes /goal_pose for xyz+yaw pose goals
         Node(
-            package='humanoid_controllers',
-            executable='humanoid_target_trajectories_publisher',
+            package='humanoid_dummy',
+            executable='humanoid_target',
             name='humanoid_target',
             output='screen',
             parameters=[{
@@ -84,7 +77,8 @@ def generate_launch_description():
                 'urdfFile': LaunchConfiguration('urdfFile'),
                 'urdfFileOrigin': LaunchConfiguration('urdfFileOrigin'),
                 'gaitCommandFile': LaunchConfiguration('gaitCommandFile')
-            }]
+            }],
+            **({'prefix': 'gnome-terminal --'} if use_gnome_terminal else {})
         ),
         
         Node(
@@ -98,6 +92,7 @@ def generate_launch_description():
                 'urdfFile': LaunchConfiguration('urdfFile'),
                 'urdfFileOrigin': LaunchConfiguration('urdfFileOrigin'),
                 'gaitCommandFile': LaunchConfiguration('gaitCommandFile')
-            }]
-        ),
+            }],
+            **({'prefix': 'gnome-terminal --'} if use_gnome_terminal else {})
+        )
     ])
