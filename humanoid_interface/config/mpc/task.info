@@ -9,8 +9,8 @@ humanoid_interface
 
 model_settings
 {
-  positionErrorGain             65.0
-  phaseTransitionStanceTime     0.60
+  positionErrorGain             45.0 ; 20.0
+  phaseTransitionStanceTime     0.70
 
   verboseCppAd                  false
   recompileLibrariesCppAd       true
@@ -19,10 +19,10 @@ model_settings
 
 swing_trajectory_config
 {
-  liftOffVelocity               0.028
-  touchDownVelocity            -0.012
-  swingHeight                   0.052
-  swingTimeScale                0.30
+  liftOffVelocity               0.020
+  touchDownVelocity            -0.002
+  swingHeight                   0.048
+  swingTimeScale                0.42
 }
 
 ; Multiple_Shooting SQP settings
@@ -244,6 +244,8 @@ jointSoftLimit
 
 selfCollision
 {
+  activate  false
+
   ; Self Collision raw object pairs
   collisionObjectPairs
   {
@@ -254,7 +256,7 @@ selfCollision
   {
   }
 
-  minimumDistance  0.02
+  minimumDistance  0.03
 
   ; relaxed log barrier parameters
   mu      1e-2
@@ -267,9 +269,9 @@ torqueLimitsTask
   (0,0)  150.0     ; hip_pitch
   (1,0)  150.0     ; hip_roll
   (2,0)  300.0     ; hip_yaw
-  (3,0)  300.0     ; knee
-  (4,0)  180.0     ; ankle_pitch
-  (5,0)   90.0     ; ankle_roll
+  (3,0)  230.0     ; knee
+  (4,0)  125.0     ; ankle_pitch
+  (5,0)   60.0     ; ankle_roll
 }
 
 frictionConeTask
@@ -279,8 +281,8 @@ frictionConeTask
 
 swingLegTask
 {
-    kp                   200
-    kd                   12
+    kp                   135
+    kd                   10
 }
 
 baseAngularTask
@@ -291,9 +293,9 @@ baseAngularTask
 
 weight
 {
-    swingLeg        100
-    baseAccel       1
-    contactForce    1
+    swingLeg        55
+    baseAccel       2
+    contactForce    6
 }
 
 ; State Estimation

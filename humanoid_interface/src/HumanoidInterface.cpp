@@ -203,9 +203,13 @@ void HumanoidInterface::setupOptimalControlProblem(const std::string& taskFile, 
       problemPtr_->equalityConstraintPtr->add(footName + "_footRoll", getFootRollConstraint(i));
     }
     }
-            // Self-collision avoidance constraint
+
+  bool activateSelfCollision = false;
+  loadData::loadCppDataType(taskFile, "selfCollision.activate", activateSelfCollision);
+  if (activateSelfCollision) {
     problemPtr_->stateSoftConstraintPtr->add("selfCollision",
-                                                     getSelfCollisionConstraint(*pinocchioInterfacePtr_, taskFile, "selfCollision", verbose));
+                                             getSelfCollisionConstraint(*pinocchioInterfacePtr_, taskFile, "selfCollision", verbose));
+  }
 
   // Pre-computation
   problemPtr_->preComputationPtr.reset(new HumanoidPreComputation(*pinocchioInterfacePtr_, centroidalModelInfo_,

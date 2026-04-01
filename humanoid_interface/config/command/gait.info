@@ -10,12 +10,12 @@ stance
 {
    modeSequence
    {
-     [0] STANCE
+     [0]     STANCE
    }
    switchingTimes
    {
-     [0] 0.0
-     [1] 1000.0
+     [0]     0.0
+     [1]     1000.0
    }
 }
 
@@ -23,14 +23,14 @@ trot
 {
    modeSequence
    {
-     [0] LCONTACT
-     [1] RCONTACT
+     [0]     LCONTACT
+     [1]     RCONTACT
    }
    switchingTimes
    {
-     [0] 0.0
-     [1] 0.50
-     [2] 1.00
+     [0]     0.0
+     [1]     0.55
+     [2]     1.10
    }
 }
 
@@ -38,18 +38,18 @@ walk
 {
    modeSequence
    {
-     [0] LCONTACT
-     [1] STANCE
-     [2] RCONTACT
-     [3] STANCE
+     [0]     LCONTACT
+     [1]     STANCE
+     [2]     RCONTACT
+     [3]     STANCE
    }
    switchingTimes
    {
-     [0] 0.0
-     [1] 0.30
-     [2] 0.60
-     [3] 0.90
-     [4] 1.20
+     [0]     0.0
+     [1]     0.32
+     [2]     0.72
+     [3]     1.04
+     [4]     1.44
    }
 }
 
@@ -57,13 +57,13 @@ quick_trot
 {
    modeSequence
    {
-     [0] LCONTACT
-     [1] RCONTACT
+     [0]     LCONTACT
+     [1]     RCONTACT
    }
    switchingTimes
    {
-     [0] 0.0
-     [1] 0.35
-     [2] 0.70
+     [0]     0.0
+     [1]     0.40
+     [2]     0.80
    }
 }
