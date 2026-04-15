@@ -1,30 +1,5 @@
 # Humanoid Control (ROS2 Humble)
 
-## Overview
-
-This repository is a ROS2 Humble migration and upgrade of an earlier ROS1-based humanoid control codebase.
-
-Key updates in this version:
-
-- Migrated from ROS1 to ROS2 Humble.
-- Validated on Ubuntu 22.04.
-- Robot model replaced/updated to Unitree G1.
-- OCS2 dependency switched to a ROS2 branch and further adapted for Humble compatibility.
-- Recommended OCS2 fork for this project:
-  - https://github.com/chengjie1127/ocs2_ros2.git
-
-## Migration Notes
-
-- Legacy ROS1 resources are kept in source_ros1 for reference.
-- Active development and runtime targets are ROS2 packages.
-- Build and launch flow in this README is ROS2-only.
-
-## Environment
-
-- OS: Ubuntu 22.04
-- ROS: ROS2 Humble
-- Build type: RelWithDebInfo (strongly recommended for runtime performance)
-
 ## Dependencies
 
 ### OCS2 and related libraries
